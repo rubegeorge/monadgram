@@ -82,11 +82,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Prevent multiple submissions
+                        // Prevent multiple submissions
             let isUploading = false;
 
             uploadForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+
+                document.activeElement.blur();
 
                 // Prevent multiple submissions
                 if (isUploading) {
@@ -181,8 +183,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     setUploadButtonState(false, 'Upload');
                 }
             });
-        }
-    }
 
     // Helper functions for better UX
     function setUploadButtonState(isLoading, text) {
