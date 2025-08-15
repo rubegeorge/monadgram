@@ -2,25 +2,81 @@ document.addEventListener('DOMContentLoaded', () => {
   const PASSWORD = 'Rockstar01';
   const PENDING_KEY = 'monadgram_pending';
   const APPROVED_KEY = 'monadgram_approved';
+  const ADMIN_SESSION_KEY = 'monadgram_admin_session';
 
   const authSection = document.getElementById('admin-auth');
   const panelSection = document.getElementById('admin-panel');
   const loginBtn = document.getElementById('admin-login');
+  const logoutBtn = document.getElementById('admin-logout');
   const passwordInput = document.getElementById('admin-password');
   const errorEl = document.getElementById('admin-error');
   const pendingGrid = document.getElementById('pending-grid');
   const approvedGrid = document.getElementById('approved-grid');
 
   let adminSessionKey = '';
-  loginBtn.addEventListener('click', () => {
-    const val = passwordInput.value || '';
-    if (val === PASSWORD) {
-      adminSessionKey = val; // use entered password as admin key header
+
+  // Check if already logged in on page load
+  function checkExistingSession() {
+    const savedSession = localStorage.getItem(ADMIN_SESSION_KEY);
+    
+    // Check if session exists
+    if (savedSession === PASSWORD) {
+      adminSessionKey = savedSession;
       authSection.style.display = 'none';
       panelSection.style.display = 'block';
       render();
+      return true;
+    }
+    return false;
+  }
+
+  // Login function
+  function login(password) {
+    if (password === PASSWORD) {
+      adminSessionKey = password;
+      localStorage.setItem(ADMIN_SESSION_KEY, password);
+      authSection.style.display = 'none';
+      panelSection.style.display = 'block';
+      render();
+      return true;
     } else {
       errorEl.style.display = 'block';
+      return false;
+    }
+  }
+
+  // Logout function
+  function logout() {
+    adminSessionKey = '';
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    authSection.style.display = 'block';
+    panelSection.style.display = 'none';
+    passwordInput.value = '';
+    errorEl.style.display = 'none';
+  }
+
+  // Check for existing session on page load
+  if (!checkExistingSession()) {
+    // Show auth section if not logged in
+    authSection.style.display = 'block';
+    panelSection.style.display = 'none';
+  }
+
+  loginBtn.addEventListener('click', () => {
+    const val = passwordInput.value || '';
+    login(val);
+  });
+
+  // Logout button
+  logoutBtn.addEventListener('click', () => {
+    logout();
+  });
+
+  // Allow Enter key to login
+  passwordInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const val = passwordInput.value || '';
+      login(val);
     }
   });
 
