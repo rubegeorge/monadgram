@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monadgram - Monad Community Gallery</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -51,8 +51,9 @@
             <h2 id="modal-title">Upload your Monad Art</h2>
             <form id="upload-form">
                 <div class="form-group">
-                    <label for="image-upload">Select Image (PNG, JPG, GIF)</label>
-                    <input type="file" id="image-upload" name="image" accept="image/png, image/jpeg, image/gif" required />
+                    <label for="image-upload">Select Image (PNG, JPG, GIF, WebP - Max 1MB)</label>
+                    <input type="file" id="image-upload" name="image" accept="image/png, image/jpeg, image/gif, image/webp" required />
+                    <div class="file-info" id="file-info" style="display: none; margin-top: 8px; font-size: 0.875rem; color: #666;"></div>
                     <div class="image-preview" id="image-preview" hidden>
                         <img id="image-preview-img" alt="Selected image preview" />
                     </div>
@@ -80,7 +81,7 @@
         </div>
     </div>
 
-    <script src="config.js?v=3"></script>
-    <script src="app.js?v=3"></script>
+    <script src="config.js?v=5"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>
