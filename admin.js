@@ -13,7 +13,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const pendingGrid = document.getElementById('pending-grid');
   const approvedGrid = document.getElementById('approved-grid');
 
+  // Bulk selection elements
+  const selectAllPending = document.getElementById('select-all-pending');
+  const selectAllApproved = document.getElementById('select-all-approved');
+  const pendingBulkActions = document.getElementById('pending-bulk-actions');
+  const approvedBulkActions = document.getElementById('approved-bulk-actions');
+  const pendingSelectedCount = document.getElementById('pending-selected-count');
+  const approvedSelectedCount = document.getElementById('approved-selected-count');
+  const bulkApproveBtn = document.getElementById('bulk-approve-btn');
+  const bulkDeletePendingBtn = document.getElementById('bulk-delete-pending-btn');
+  const bulkDeleteApprovedBtn = document.getElementById('bulk-delete-approved-btn');
+  const clearPendingSelectionBtn = document.getElementById('clear-pending-selection-btn');
+  const clearApprovedSelectionBtn = document.getElementById('clear-approved-selection-btn');
+
   let adminSessionKey = '';
+  let selectedPending = new Set();
+  let selectedApproved = new Set();
 
   // Check if already logged in on page load
   function checkExistingSession() {
@@ -80,13 +95,81 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Bulk selection event listeners
+  selectAllPending?.addEventListener('change', (e) => {
+    const checkboxes = pendingGrid.querySelectorAll('.item-checkbox');
+    checkboxes.forEach(cb => {
+      cb.checked = e.target.checked;
+      if (e.target.checked) {
+        selectedPending.add(cb.dataset.id);
+      } else {
+        selectedPending.delete(cb.dataset.id);
+      }
+    });
+    updateBulkActionVisibility();
+  });
+
+  selectAllApproved?.addEventListener('change', (e) => {
+    const checkboxes = approvedGrid.querySelectorAll('.item-checkbox');
+    checkboxes.forEach(cb => {
+      cb.checked = e.target.checked;
+      if (e.target.checked) {
+        selectedApproved.add(cb.dataset.id);
+      } else {
+        selectedApproved.delete(cb.dataset.id);
+      }
+    });
+    updateBulkActionVisibility();
+  });
+
+  bulkApproveBtn?.addEventListener('click', () => {
+    if (selectedPending.size > 0) {
+      bulkApprove(Array.from(selectedPending));
+    }
+  });
+
+  bulkDeletePendingBtn?.addEventListener('click', () => {
+    if (selectedPending.size > 0) {
+      bulkDelete(Array.from(selectedPending));
+    }
+  });
+
+  bulkDeleteApprovedBtn?.addEventListener('click', () => {
+    if (selectedApproved.size > 0) {
+      bulkDelete(Array.from(selectedApproved));
+    }
+  });
+
+  clearPendingSelectionBtn?.addEventListener('click', () => {
+    selectedPending.clear();
+    const checkboxes = pendingGrid.querySelectorAll('.item-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+    selectAllPending.checked = false;
+    updateBulkActionVisibility();
+  });
+
+  clearApprovedSelectionBtn?.addEventListener('click', () => {
+    selectedApproved.clear();
+    const checkboxes = approvedGrid.querySelectorAll('.item-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+    selectAllApproved.checked = false;
+    updateBulkActionVisibility();
+  });
+
   async function render() {
     const [pending, approved] = await Promise.all([
       apiListPending(),
       apiListApproved(),
     ]);
+    
+    // Clear selections when re-rendering
+    selectedPending.clear();
+    selectedApproved.clear();
+    
     renderGrid(pendingGrid, pending, true);
     renderGrid(approvedGrid, approved, false);
+    
+    updateBulkActionVisibility();
   }
 
   function renderGrid(root, items, isPending) {
@@ -101,6 +184,29 @@ document.addEventListener('DOMContentLoaded', () => {
     items.forEach((item) => {
       const card = document.createElement('div');
       card.className = 'image-card';
+      card.style.position = 'relative';
+      
+      // Add checkbox for bulk selection
+      const checkboxContainer = document.createElement('div');
+      checkboxContainer.style.cssText = 'position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(0,0,0,0.7); border-radius: 4px; padding: 4px;';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'item-checkbox';
+      checkbox.dataset.id = item.id;
+      checkbox.style.cssText = 'margin: 0; cursor: pointer; transform: scale(1.2);';
+      checkbox.addEventListener('change', (e) => {
+        const selectedSet = isPending ? selectedPending : selectedApproved;
+        if (e.target.checked) {
+          selectedSet.add(item.id);
+        } else {
+          selectedSet.delete(item.id);
+        }
+        updateBulkActionVisibility();
+        updateSelectAllCheckbox(isPending);
+      });
+      checkboxContainer.appendChild(checkbox);
+      card.appendChild(checkboxContainer);
+      
       const container = document.createElement('div');
       container.className = 'image-container';
       const img = document.createElement('img');
@@ -182,6 +288,90 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
   }
 
+  // Bulk action functions
+  async function bulkApprove(ids) {
+    if (!confirm(`Are you sure you want to approve ${ids.length} submissions?`)) {
+      return;
+    }
+    
+    const results = await Promise.all(ids.map(id => apiApprove(id)));
+    const successful = results.filter(Boolean).length;
+    const failed = results.length - successful;
+    
+    if (failed > 0) {
+      alert(`${successful} approved successfully, ${failed} failed. Check console for details.`);
+    } else {
+      alert(`Successfully approved ${successful} submissions!`);
+    }
+    
+    selectedPending.clear();
+    render();
+  }
+
+  async function bulkDelete(ids) {
+    if (!confirm(`Are you sure you want to delete ${ids.length} submissions? This action cannot be undone.`)) {
+      return;
+    }
+    
+    const results = await Promise.all(ids.map(id => apiDelete(id)));
+    const successful = results.filter(Boolean).length;
+    const failed = results.length - successful;
+    
+    if (failed > 0) {
+      alert(`${successful} deleted successfully, ${failed} failed. Check console for details.`);
+    } else {
+      alert(`Successfully deleted ${successful} submissions!`);
+    }
+    
+    selectedPending.clear();
+    selectedApproved.clear();
+    render();
+  }
+
+  // Update bulk action visibility and counts
+  function updateBulkActionVisibility() {
+    const pendingCount = selectedPending.size;
+    const approvedCount = selectedApproved.size;
+    
+    // Update pending section
+    if (pendingCount > 0) {
+      pendingBulkActions.style.display = 'flex';
+      pendingSelectedCount.textContent = `${pendingCount} selected`;
+    } else {
+      pendingBulkActions.style.display = 'none';
+    }
+    
+    // Update approved section
+    if (approvedCount > 0) {
+      approvedBulkActions.style.display = 'flex';
+      approvedSelectedCount.textContent = `${approvedCount} selected`;
+    } else {
+      approvedBulkActions.style.display = 'none';
+    }
+  }
+
+  // Update select all checkbox state
+  function updateSelectAllCheckbox(isPending) {
+    const grid = isPending ? pendingGrid : approvedGrid;
+    const selectAll = isPending ? selectAllPending : selectAllApproved;
+    const checkboxes = grid.querySelectorAll('.item-checkbox');
+    const checkedBoxes = grid.querySelectorAll('.item-checkbox:checked');
+    
+    if (checkboxes.length === 0) {
+      selectAll.indeterminate = false;
+      selectAll.checked = false;
+    } else if (checkedBoxes.length === checkboxes.length) {
+      selectAll.indeterminate = false;
+      selectAll.checked = true;
+    } else if (checkedBoxes.length > 0) {
+      selectAll.indeterminate = true;
+      selectAll.checked = false;
+    } else {
+      selectAll.indeterminate = false;
+      selectAll.checked = false;
+    }
+  }
+
   // ---- API helpers (Edge Functions) ----
   async function apiListPending() {
     const url = window.MonadgramConfig?.EDGE?.LIST_PENDING_URL || '';
@@ -226,5 +416,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return res.json();
   }
 });
+
 
 
