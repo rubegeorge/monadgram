@@ -276,9 +276,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('No file selected');
             }
             
-            const maxSize = 10 * 1024 * 1024; // 10MB
+            const maxSize = 1 * 1024 * 1024; // 1MB
             if (file.size > maxSize) {
-                throw new Error('File size must be less than 10MB');
+                throw new Error('File size must be less than 1MB. Please compress your image and try again.');
             }
             
             const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -756,19 +756,48 @@ document.addEventListener('DOMContentLoaded', function() {
         handleFilePreview() {
             try {
                 if (DOM.fileInput?.files?.[0] && DOM.imagePreview && DOM.imagePreviewImg) {
+                    const file = DOM.fileInput.files[0];
+                    
+                    // Validate file size immediately
+                    try {
+                        UploadManager.validateFile(file);
+                    } catch (validationError) {
+                        // Show error message and reset file input
+                        MessageManager.show(validationError.message, 'error');
+                        DOM.fileInput.value = '';
+                        DOM.imagePreview.hidden = true;
+                        DOM.imagePreviewImg.removeAttribute('src');
+                        if (DOM.fileInfo) DOM.fileInfo.style.display = 'none';
+                        return;
+                    }
+                    
                     const reader = new FileReader();
                     reader.onload = () => {
                         DOM.imagePreviewImg.src = reader.result;
                         DOM.imagePreview.hidden = false;
+                        
+                        // Show file size info
+                        const fileSizeKB = Math.round(file.size / 1024);
+                        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                        const sizeText = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
+                        
+                        if (DOM.fileInfo) {
+                            DOM.fileInfo.textContent = `File: ${file.name} (${sizeText})`;
+                            DOM.fileInfo.style.display = 'block';
+                            DOM.fileInfo.style.color = file.size <= 1024 * 1024 ? '#10b981' : '#ef4444'; // Green if under 1MB, red if over
+                        }
+                        
+                        console.log(`File selected: ${file.name} (${sizeText})`);
                     };
                     reader.onerror = () => {
                         ErrorHandler.logError('FileReader', new Error('Failed to read file'));
                         MessageManager.show('Failed to preview image', 'error');
                     };
-                    reader.readAsDataURL(DOM.fileInput.files[0]);
+                    reader.readAsDataURL(file);
                 } else {
                     if (DOM.imagePreview) DOM.imagePreview.hidden = true;
                     if (DOM.imagePreviewImg) DOM.imagePreviewImg.removeAttribute('src');
+                    if (DOM.fileInfo) DOM.fileInfo.style.display = 'none';
                 }
             } catch (error) {
                 ErrorHandler.logError('EventManager.handleFilePreview', error);
@@ -1079,6 +1108,7 @@ document.addEventListener('DOMContentLoaded', function() {
             DOM.cancelBtn = Utils.safeQuery('#cancel-btn');
             DOM.uploadForm = Utils.safeQuery('#upload-form');
             DOM.fileInput = Utils.safeQuery('#image-upload');
+            DOM.fileInfo = Utils.safeQuery('#file-info');
             DOM.uploadBtn = Utils.safeQuery('#upload-form button[type="submit"]');
             
             DOM.imagePreview = Utils.safeQuery('#image-preview');
