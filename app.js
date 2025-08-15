@@ -2,15 +2,12 @@ document.addEventListener('DOMContentLoaded', function() {
     'use strict';
     
     // =====================================================
-    // 1. DOM ELEMENT CACHING (Performance Improvement #1)
+    // DOM ELEMENT CACHING & STATE MANAGEMENT 
     // =====================================================
     const DOM = {
-        // Core elements
         loading: null,
         gallery: null,
         galleryGrid: null,
-        
-        // Upload modal elements
         shareArtBtn: null,
         uploadModal: null,
         cancelBtn: null,
@@ -18,24 +15,15 @@ document.addEventListener('DOMContentLoaded', function() {
         fileInput: null,
         twitterInput: null,
         uploadBtn: null,
-        
-        // Preview elements
         imagePreview: null,
         imagePreviewImg: null,
-        
-        // Success elements
         successOverlay: null,
         successClose: null,
-        
-        // Dynamic elements
         imageCards: null,
         images: null,
         messageEl: null
     };
     
-    // =====================================================
-    // 2. STATE MANAGEMENT PATTERN (Improvement #8)
-    // =====================================================
     const AppState = {
         isUploading: false,
         isInitialized: false,
@@ -46,7 +34,6 @@ document.addEventListener('DOMContentLoaded', function() {
         observers: new Set(),
         eventListeners: new Map(),
         
-        // State setters with validation
         setUploading(value) {
             if (typeof value !== 'boolean') {
                 throw new Error('Upload state must be boolean');
@@ -55,11 +42,9 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         cleanup() {
-            // Clear timeouts
             if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
             if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
             
-            // Disconnect observers
             this.observers.forEach(observer => {
                 try {
                     observer.disconnect();
@@ -69,7 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             this.observers.clear();
             
-            // Remove event listeners
             this.eventListeners.forEach((listener, element) => {
                 try {
                     element.removeEventListener(listener.event, listener.handler);
@@ -82,10 +66,9 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 3. UTILITY FUNCTIONS WITH ERROR HANDLING
+    // UTILITY FUNCTIONS
     // =====================================================
     const Utils = {
-        // Debounce function for performance
         debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -98,7 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         },
         
-        // Safe DOM query with error handling
         safeQuery(selector, parent = document) {
             try {
                 return parent.querySelector(selector);
@@ -108,7 +90,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
-        // Safe DOM query all with error handling
         safeQueryAll(selector, parent = document) {
             try {
                 return parent.querySelectorAll(selector);
@@ -118,7 +99,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
-        // Safe storage operations
         safeGetStorage(key, fallback = null) {
             try {
                 const item = localStorage.getItem(key);
@@ -141,13 +121,12 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 4. ENHANCED ERROR HANDLING (Improvement #3)
+    // ERROR HANDLING
     // =====================================================
     const ErrorHandler = {
         logError(context, error, data = {}) {
             console.error(`[${context}] Error:`, error, data);
             
-            // Track error for analytics
             if (window.MonadgramApp?.trackEvent) {
                 window.MonadgramApp.trackEvent('error', {
                     context,
@@ -161,7 +140,6 @@ document.addEventListener('DOMContentLoaded', function() {
         handleAsyncError(context, error, fallback = null) {
             this.logError(context, error);
             
-            // Show user-friendly message
             if (DOM.messageEl || context === 'upload') {
                 MessageManager.show('Something went wrong. Please try again.', 'error');
             }
@@ -171,14 +149,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 5. ENHANCED MESSAGE MANAGER (Improvement #5)
+    // MESSAGE MANAGER
     // =====================================================
     const MessageManager = {
         show(message, type = 'info', duration = 5000) {
             try {
                 if (!DOM.uploadForm) return;
                 
-                // Create or update message element
                 if (!DOM.messageEl) {
                     DOM.messageEl = document.createElement('div');
                     DOM.messageEl.id = 'upload-message';
@@ -186,14 +163,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     DOM.uploadForm.appendChild(DOM.messageEl);
                 }
                 
-                // Set message content and styling
                 DOM.messageEl.textContent = message;
                 DOM.messageEl.className = `upload-message ${type}`;
                 DOM.messageEl.hidden = false;
                 DOM.messageEl.setAttribute('role', 'alert');
                 DOM.messageEl.setAttribute('aria-live', 'polite');
                 
-                // Auto-hide after duration
                 setTimeout(() => {
                     if (DOM.messageEl) {
                         DOM.messageEl.hidden = true;
@@ -217,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 6. LOADING MANAGER WITH STATES (Improvement #5)
+    // LOADING MANAGER
     // =====================================================
     const LoadingManager = {
         show() {
@@ -259,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 7. STORAGE MANAGER (Improvement #3)
+    // STORAGE MANAGER
     // =====================================================
     const STORAGE_KEYS = {
         PENDING: 'monadgram_pending',
@@ -293,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 8. UPLOAD MANAGER (Improvement #4 - Function Decomposition)
+    // UPLOAD MANAGER
     // =====================================================
     const UploadManager = {
         validateFile(file) {
@@ -301,7 +276,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('No file selected');
             }
             
-            // Add file validation logic here if needed
             const maxSize = 10 * 1024 * 1024; // 10MB
             if (file.size > maxSize) {
                 throw new Error('File size must be less than 10MB');
@@ -408,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 9. MODAL MANAGER (Improvement #4)
+    // MODAL MANAGER
     // =====================================================
     const ModalManager = {
         open() {
@@ -418,7 +392,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     DOM.shareArtBtn.setAttribute('aria-expanded', 'true');
                     DOM.uploadModal.setAttribute('aria-hidden', 'false');
                     
-                    // Focus first input for accessibility
                     if (DOM.fileInput) {
                         DOM.fileInput.focus();
                     }
@@ -445,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 10. GALLERY MANAGER (Improvement #7)
+    // GALLERY MANAGER - FIXED SUPABASE IMAGE LOADING
     // =====================================================
     const GalleryManager = {
         setupCustomLazyLoading() {
@@ -474,7 +447,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 AppState.observers.add(imageObserver);
                 
-                // Observe existing images
                 DOM.images.forEach(img => {
                     imageObserver.observe(img);
                 });
@@ -512,41 +484,150 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
-        addImageToGallery(src, twitter) {
+        // *** FIXED: RESTORE ORIGINAL SUPABASE IMAGE LOADING ***
+        async renderApprovedFromStorage() {
             try {
                 if (!DOM.galleryGrid) return;
                 
-                const imageCard = document.createElement('div');
-                imageCard.className = 'image-card';
-                imageCard.innerHTML = `
-                    <div class="image-container">
-                        <img src="${src}" alt="Monad art by ${twitter}" loading="lazy">
-                        <div class="image-overlay">
-                            <div class="image-title">Monad Art</div>
-                            <div class="image-credit">by ${twitter}</div>
-                        </div>
-                    </div>
-                `;
+                const cfg = window.MonadgramConfig || {};
+                const listApprovedUrl = cfg.EDGE?.LIST_APPROVED_URL;
                 
-                DOM.galleryGrid.appendChild(imageCard);
-                
-                // Setup lazy loading for new image
-                const newImg = imageCard.querySelector('img');
-                if (newImg) {
-                    this.setupCustomLazyLoading();
+                // First try Edge Function (same as your original)
+                if (listApprovedUrl) {
+                    try {
+                        console.log('Fetching approved list from', listApprovedUrl);
+                        const res = await fetch(listApprovedUrl);
+                        if (res.ok) {
+                            const { items } = await res.json();
+                            console.log('Approved items fetched:', Array.isArray(items) ? items.length : 0);
+                            items.forEach(({ storage_path, twitter }) => {
+                                const card = document.createElement('div');
+                                card.className = 'image-card';
+                                
+                                const container = document.createElement('div');
+                                container.className = 'image-container';
+                                
+                                const img = document.createElement('img');
+                                const srcUrl = cfg.buildPublicUrl ? cfg.buildPublicUrl(storage_path) : storage_path;
+                                img.src = srcUrl;
+                                img.alt = `Monad art by ${twitter}`;
+                                img.loading = 'lazy';
+                                
+                                const overlay = document.createElement('div');
+                                overlay.className = 'image-overlay';
+                                
+                                const title = document.createElement('span');
+                                title.className = 'image-title';
+                                title.textContent = `Art by ${twitter}`;
+                                
+                                overlay.appendChild(title);
+                                container.appendChild(img);
+                                container.appendChild(overlay);
+                                card.appendChild(container);
+                                DOM.galleryGrid.prepend(card);
+                                
+                                requestAnimationFrame(() => {
+                                    card.style.animationPlayState = 'running';
+                                    card.classList.add('animate-in');
+                                });
+                            });
+                            return;
+                        } else {
+                            console.warn('list-approved failed with status', res.status);
+                        }
+                    } catch (e) {
+                        console.warn('Remote approved fetch failed, falling back to local storage:', e);
+                    }
                 }
                 
-            } catch (error) {
-                ErrorHandler.logError('GalleryManager.addImageToGallery', error, { src, twitter });
-            }
-        },
-        
-        renderApprovedFromStorage() {
-            try {
+                // Fallback to REST API (same as your original)
+                if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+                    try {
+                        const restUrl = `${cfg.SUPABASE_URL}/rest/v1/submissions?select=storage_path,twitter,created_at&status=eq.approved&order=created_at.desc`;
+                        console.log('Fallback fetching REST approved list from', restUrl);
+                        const res = await fetch(restUrl, { 
+                            headers: { 
+                                apikey: cfg.SUPABASE_ANON_KEY, 
+                                Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}` 
+                            } 
+                        });
+                        if (res.ok) {
+                            const items = await res.json();
+                            items.forEach(({ storage_path, twitter }) => {
+                                const card = document.createElement('div');
+                                card.className = 'image-card';
+                                
+                                const container = document.createElement('div');
+                                container.className = 'image-container';
+                                
+                                const img = document.createElement('img');
+                                const srcUrl = cfg.buildPublicUrl ? cfg.buildPublicUrl(storage_path) : storage_path;
+                                img.src = srcUrl;
+                                img.alt = `Monad art by ${twitter}`;
+                                img.loading = 'lazy';
+                                
+                                const overlay = document.createElement('div');
+                                overlay.className = 'image-overlay';
+                                
+                                const title = document.createElement('span');
+                                title.className = 'image-title';
+                                title.textContent = `Art by ${twitter}`;
+                                
+                                overlay.appendChild(title);
+                                container.appendChild(img);
+                                container.appendChild(overlay);
+                                card.appendChild(container);
+                                DOM.galleryGrid.prepend(card);
+                                
+                                requestAnimationFrame(() => {
+                                    card.style.animationPlayState = 'running';
+                                    card.classList.add('animate-in');
+                                });
+                            });
+                            return;
+                        } else {
+                            console.warn('REST approved fetch failed with status', res.status);
+                        }
+                    } catch (e) {
+                        console.warn('REST approved fetch error:', e);
+                    }
+                }
+                
+                // Final fallback to local storage (same as your original)
                 const approved = StorageManager.getApprovedSubmissions();
-                approved.forEach(item => {
-                    this.addImageToGallery(item.src, item.twitter);
-                });
+                if (!approved || !approved.length) return;
+                
+                for (let i = approved.length - 1; i >= 0; i -= 1) {
+                    const { src, twitter } = approved[i];
+                    const card = document.createElement('div');
+                    card.className = 'image-card';
+                    
+                    const container = document.createElement('div');
+                    container.className = 'image-container';
+                    
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.alt = `Monad art by ${twitter}`;
+                    img.loading = 'lazy';
+                    
+                    const overlay = document.createElement('div');
+                    overlay.className = 'image-overlay';
+                    
+                    const title = document.createElement('span');
+                    title.className = 'image-title';
+                    title.textContent = `Art by ${twitter}`;
+                    
+                    overlay.appendChild(title);
+                    container.appendChild(img);
+                    container.appendChild(overlay);
+                    card.appendChild(container);
+                    DOM.galleryGrid.prepend(card);
+                    
+                    requestAnimationFrame(() => {
+                        card.style.animationPlayState = 'running';
+                        card.classList.add('animate-in');
+                    });
+                }
             } catch (error) {
                 ErrorHandler.logError('GalleryManager.renderApprovedFromStorage', error);
             }
@@ -554,7 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 11. EVENT MANAGER (Improvement #6)
+    // EVENT MANAGER
     // =====================================================
     const EventManager = {
         addListener(element, event, handler, options = {}) {
@@ -569,22 +650,18 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         setupUploadModalEvents() {
-            // Share button click
             this.addListener(DOM.shareArtBtn, 'click', () => {
                 ModalManager.open();
             });
             
-            // Cancel button click
             this.addListener(DOM.cancelBtn, 'click', () => {
                 ModalManager.close();
             });
             
-            // File input change (preview)
             this.addListener(DOM.fileInput, 'change', () => {
                 this.handleFilePreview();
             });
             
-            // Form submit
             this.addListener(DOM.uploadForm, 'submit', (e) => {
                 this.handleFormSubmit(e);
             });
@@ -616,7 +693,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             document.activeElement?.blur();
             
-            // Prevent multiple submissions
             if (AppState.isUploading) {
                 console.log('Upload already in progress, ignoring submission');
                 return;
@@ -626,14 +702,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 AppState.setUploading(true);
                 UploadManager.setButtonState(true, 'Uploading...');
                 
-                // Validate inputs
                 const file = DOM.fileInput?.files?.[0];
                 const twitterValue = DOM.twitterInput?.value;
                 
                 UploadManager.validateFile(file);
                 const twitterUser = UploadManager.validateTwitterHandle(twitterValue);
                 
-                // Process upload
                 const reader = new FileReader();
                 reader.onload = async () => {
                     try {
@@ -653,7 +727,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                         }
                         
-                        // Close modal and show success
                         ModalManager.close();
                         this.showSuccessOverlay();
                         
@@ -707,28 +780,24 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         setupGlobalEvents() {
-            // Debounced scroll handler (Improvement #2)
             const debouncedScroll = Utils.debounce(() => {
                 // Handle scroll-based animations or effects
             }, 16);
             
             this.addListener(window, 'scroll', debouncedScroll, { passive: true });
             
-            // Debounced resize handler (Improvement #2)
             const debouncedResize = Utils.debounce(() => {
                 // Handle responsive adjustments
             }, 250);
             
             this.addListener(window, 'resize', debouncedResize);
             
-            // Keyboard navigation
             this.addListener(document, 'keydown', (e) => {
                 if (e.key === 'Escape' && DOM.uploadModal && !DOM.uploadModal.hidden) {
                     ModalManager.close();
                 }
             });
             
-            // Error handling for failed image loads
             this.addListener(document, 'error', (e) => {
                 if (e.target.tagName === 'IMG') {
                     console.error('Failed to load image:', e.target.src);
@@ -736,16 +805,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, true);
             
-            // Visibility change handling
             this.addListener(document, 'visibilitychange', () => {
                 if (document.hidden) {
-                    // Page is hidden, could pause animations
+                    // Page is hidden
                 } else {
-                    // Page is visible again, could resume animations
+                    // Page is visible again
                 }
             });
             
-            // Online/offline status
             this.addListener(window, 'online', () => {
                 console.log('Application is online');
                 window.MonadgramApp?.trackEvent?.('app_online');
@@ -756,17 +823,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.MonadgramApp?.trackEvent?.('app_offline');
             });
             
-            // Touch gesture support
             this.addListener(document, 'touchstart', (e) => {
                 AppState.touchStartY = e.changedTouches[0].screenY;
             }, { passive: true });
             
             this.addListener(document, 'touchend', (e) => {
-                AppState.touchEndY = e.changedTouches[0].screenY;
+                AppState.touchEndY = e.changedTouches.screenY;
                 this.handleSwipeGesture();
             }, { passive: true });
             
-            // Smooth scroll for anchor links
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 this.addListener(anchor, 'click', function(e) {
                     e.preventDefault();
@@ -800,14 +865,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 12. ACCESSIBILITY MANAGER (Improvement #9)
+    // ACCESSIBILITY MANAGER
     // =====================================================
     const AccessibilityManager = {
         setup() {
             try {
                 this.addAriaLabels();
                 this.setupFocusIndicators();
-                this.setupKeyboardNavigation();
             } catch (error) {
                 ErrorHandler.logError('AccessibilityManager.setup', error);
             }
@@ -832,21 +896,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     element.classList.remove('focus-visible');
                 });
             });
-        },
-        
-        setupKeyboardNavigation() {
-            // Additional keyboard navigation can be added here
-            // For now, basic Escape key handling is in EventManager
         }
     };
     
     // =====================================================
-    // 13. ADMIN MANAGER
+    // ADMIN MANAGER - FIXED: ONLY SHOW ON LOCALHOST
     // =====================================================
     const AdminManager = {
+        // *** FIXED: Only show admin panel on localhost/development ***
         isAdmin() {
-            // In production, implement proper authentication
-            return true;
+            return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         },
         
         openAdminPanel() {
@@ -858,6 +917,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         setupAdminButton() {
+            // *** FIXED: Admin button will only appear on localhost now ***
             if (!this.isAdmin()) return;
             
             try {
@@ -866,7 +926,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 adminBtn.className = 'btn btn--primary admin-btn';
                 adminBtn.setAttribute('aria-label', 'Open Admin Panel');
                 
-                // Use CSS classes instead of inline styles (Improvement #9)
                 adminBtn.style.cssText = `
                     position: fixed;
                     top: 20px;
@@ -886,7 +945,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 14. PERFORMANCE MANAGER
+    // PERFORMANCE MANAGER
     // =====================================================
     const PerformanceManager = {
         trackPageLoad() {
@@ -921,16 +980,14 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 15. MAIN INITIALIZATION FUNCTION
+    // MAIN INITIALIZATION
     // =====================================================
     function cacheDOMElements() {
         try {
-            // Core elements
             DOM.loading = Utils.safeQuery('#loading');
             DOM.gallery = Utils.safeQuery('#gallery');
             DOM.galleryGrid = Utils.safeQuery('.gallery-grid');
             
-            // Upload modal elements
             DOM.shareArtBtn = Utils.safeQuery('#share-art-btn');
             DOM.uploadModal = Utils.safeQuery('#upload-modal');
             DOM.cancelBtn = Utils.safeQuery('#cancel-btn');
@@ -938,19 +995,15 @@ document.addEventListener('DOMContentLoaded', function() {
             DOM.fileInput = Utils.safeQuery('#image-upload');
             DOM.uploadBtn = Utils.safeQuery('#upload-form button[type="submit"]');
             
-            // Preview elements
             DOM.imagePreview = Utils.safeQuery('#image-preview');
             DOM.imagePreviewImg = Utils.safeQuery('#image-preview-img');
             
-            // Success elements
             DOM.successOverlay = Utils.safeQuery('#success-overlay');
             DOM.successClose = Utils.safeQuery('#success-close');
             
-            // Dynamic collections
             DOM.imageCards = Utils.safeQueryAll('.image-card');
             DOM.images = Utils.safeQueryAll('img[loading="lazy"]');
             
-            // Get form elements safely
             if (DOM.uploadForm) {
                 DOM.twitterInput = DOM.uploadForm.elements['twitter'];
                 if (!DOM.fileInput) {
@@ -965,40 +1018,33 @@ document.addEventListener('DOMContentLoaded', function() {
     
     async function init() {
         try {
-            // 1. Cache DOM elements first
             cacheDOMElements();
             
-            // 2. Show loading state
             LoadingManager.show();
             
-            // 3. Setup all managers
             AccessibilityManager.setup();
             EventManager.setupGlobalEvents();
             
-            // 4. Setup upload modal if elements exist
             if (DOM.uploadForm && DOM.shareArtBtn) {
                 EventManager.setupUploadModalEvents();
             }
             
-            // 5. Setup gallery features
             GalleryManager.setupCustomLazyLoading();
             GalleryManager.setupScrollAnimations();
             
-            // 6. Setup admin features
+            // *** FIXED: Admin button only shows on localhost ***
             AdminManager.setupAdminButton();
             
-            // 7. Setup performance monitoring
             PerformanceManager.setupServiceWorker();
             
-            // 8. Simulate loading and show gallery
             setTimeout(() => {
                 LoadingManager.hide();
                 LoadingManager.showGallery();
+                // *** FIXED: This will now properly load from Supabase ***
                 GalleryManager.renderApprovedFromStorage();
                 AppState.isInitialized = true;
             }, 1500);
             
-            // 9. Track performance
             window.addEventListener('load', () => {
                 PerformanceManager.trackPageLoad();
             });
@@ -1006,7 +1052,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             ErrorHandler.logError('init', error);
             
-            // Fallback: at least try to show the gallery
             setTimeout(() => {
                 LoadingManager.hide();
                 LoadingManager.showGallery();
@@ -1015,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // =====================================================
-    // 16. CLEANUP AND EXPORT
+    // CLEANUP AND EXPORT
     // =====================================================
     function cleanup() {
         try {
@@ -1025,14 +1070,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Cleanup on page unload (Improvement #6)
     window.addEventListener('beforeunload', cleanup);
     
-    // Analytics function
     function trackEvent(eventName, properties = {}) {
         try {
             console.log('Event tracked:', eventName, properties);
-            // Implement your analytics tracking here
         } catch (error) {
             console.error('Error tracking event:', error);
         }
@@ -1045,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', function() {
         trackEvent,
         cleanup,
         
-        // Development helpers
+        // Development helpers (only on localhost)
         ...(window.location.hostname === 'localhost' && {
             DOM,
             AppState,
@@ -1056,9 +1098,10 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // =====================================================
-    // 17. START THE APPLICATION
+    // START APPLICATION
     // =====================================================
     init();
 });
+
 
 
