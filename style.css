@@ -796,7 +796,7 @@ body {
 .header {
   text-align: center;
   padding: var(--space-32) 0;
-  background: linear-gradient(135deg, #2e004f 0%, #6a1b9a 50%, #8B5CF6 100%);
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 50%, #8B5CF6 100%);
   margin-bottom: var(--space-32);
   position: relative;
   overflow: hidden;
@@ -825,22 +825,29 @@ body {
   font-weight: 900;
   font-size: clamp(2.5rem, 5vw, 4rem);
   margin: 0 0 var(--space-16) 0;
-  background: linear-gradient(90deg, #AC42F4 0%, #F261E4 100%);
+  background: linear-gradient(45deg, #ffffff, #f0f0f0);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: 2px;
-  text-shadow: 0 4px 18px rgba(172, 66, 244, 0.5);
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .subtitle {
   font-family: 'Poppins', 'Inter', sans-serif;
   font-weight: 600;
-  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  font-size: clamp(1.05rem, 1.9vw, 1.35rem);
   margin: 0 0 var(--space-24) 0;
-  color: #f3d6ff;
-  letter-spacing: 1px;
-  text-shadow: 0 2px 10px rgba(242, 97, 228, 0.35);
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Hide line break on larger screens */
+@media (min-width: 768px) {
+  .subtitle br {
+    display: none;
+  }
 }
 
 .description {
