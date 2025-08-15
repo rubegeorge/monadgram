@@ -34,10 +34,45 @@
           <h2 style="margin: 0;">Admin Panel</h2>
           <button id="admin-logout" class="btn btn--secondary" style="padding: 8px 16px;">Logout</button>
         </div>
-        <h3 style="margin: 0 0 12px 0;">Pending Submissions</h3>
-        <div class="gallery-grid" id="pending-grid"></div>
-        <h3 style="margin: 24px 0 12px 0;">Approved</h3>
-        <div class="gallery-grid" id="approved-grid"></div>
+        
+        <!-- Pending Submissions Section -->
+        <div style="margin-bottom: 32px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Pending Submissions</h3>
+            <div class="bulk-actions" id="pending-bulk-actions" style="display: none; gap: 8px;">
+              <span id="pending-selected-count" style="color: rgba(230,241,255,0.8); font-size: 0.875rem; margin-right: 8px;">0 selected</span>
+              <button id="bulk-approve-btn" class="btn btn--primary btn--sm">Approve Selected</button>
+              <button id="bulk-delete-pending-btn" class="btn btn--secondary btn--sm">Delete Selected</button>
+              <button id="clear-pending-selection-btn" class="btn btn--ghost btn--sm">Clear Selection</button>
+            </div>
+          </div>
+          <div style="margin-bottom: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; color: rgba(230,241,255,0.8); font-size: 0.875rem; cursor: pointer;">
+              <input type="checkbox" id="select-all-pending" style="margin: 0;">
+              <span>Select All Pending</span>
+            </label>
+          </div>
+          <div class="gallery-grid" id="pending-grid"></div>
+        </div>
+        
+        <!-- Approved Submissions Section -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Approved</h3>
+            <div class="bulk-actions" id="approved-bulk-actions" style="display: none; gap: 8px;">
+              <span id="approved-selected-count" style="color: rgba(230,241,255,0.8); font-size: 0.875rem; margin-right: 8px;">0 selected</span>
+              <button id="bulk-delete-approved-btn" class="btn btn--secondary btn--sm">Delete Selected</button>
+              <button id="clear-approved-selection-btn" class="btn btn--ghost btn--sm">Clear Selection</button>
+            </div>
+          </div>
+          <div style="margin-bottom: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; color: rgba(230,241,255,0.8); font-size: 0.875rem; cursor: pointer;">
+              <input type="checkbox" id="select-all-approved" style="margin: 0;">
+              <span>Select All Approved</span>
+            </label>
+          </div>
+          <div class="gallery-grid" id="approved-grid"></div>
+        </div>
       </section>
     </main>
 
@@ -46,8 +81,8 @@
     </footer>
   </div>
 
-  <script src="config.js?v=8"></script>
-  <script src="admin.js?v=8"></script>
+  <script src="config.js?v=14"></script>
+  <script src="admin.js?v=14"></script>
 </body>
 </html>
 
