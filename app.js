@@ -477,7 +477,16 @@ document.addEventListener('DOMContentLoaded', function() {
         async fileToDataUrl(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
+                reader.onload = () => {
+                    const result = reader.result;
+                    console.log('File converted to data URL:', {
+                        type: file.type,
+                        size: file.size,
+                        resultLength: result.length,
+                        isGif: file.type === 'image/gif'
+                    });
+                    resolve(result);
+                };
                 reader.readAsDataURL(file);
             });
         },
@@ -792,6 +801,16 @@ document.addEventListener('DOMContentLoaded', function() {
             img.alt = `Monad art by ${twitter}`;
             img.loading = 'lazy';
             
+            // Ensure GIFs are treated as animated images
+            if (imgSrc.includes('image/gif') || imgSrc.includes('.gif') || 
+                (src && src.includes('image/gif'))) {
+                console.log('GIF detected, ensuring proper handling:', imgSrc);
+                // Force reload to ensure GIF animation starts
+                img.onload = () => {
+                    img.style.animationPlayState = 'running';
+                };
+            }
+            
             const overlay = document.createElement('div');
             overlay.className = 'image-overlay';
             
@@ -981,8 +1000,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 UploadManager.setButtonState(true, 'Processing...');
                 
                 try {
-                    // Process the image (compress if needed, preserve GIFs)
-                    const processedImage = await UploadManager.compressImage(file);
+                    // Handle GIFs separately - no compression, no processing
+                    let uploadData;
+                    let fileName = file.name;
+                    
+                    if (file.type === 'image/gif') {
+                        // GIFs: Use original file directly, no compression, no conversion
+                        uploadData = file;
+                        console.log('GIF upload - using original file, no processing');
+                    } else {
+                        // Other formats: Use compression
+                        uploadData = await UploadManager.compressImage(file);
+                    }
                     
                     // Update button to show upload status
                     UploadManager.setButtonState(true, 'Uploading...');
@@ -991,33 +1020,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (cfg.EDGE?.UPLOAD_URL) {
                         try {
-                            // For GIFs, we need to convert to data URL for upload
-                            let uploadData;
+                            // For GIFs, convert to data URL only at the last moment for upload
+                            let finalUploadData = uploadData;
                             if (file.type === 'image/gif') {
-                                // Convert GIF to data URL for upload while preserving animation
-                                uploadData = await UploadManager.fileToDataUrl(file);
-                            } else {
-                                uploadData = processedImage; // Use compressed data URL
+                                finalUploadData = await UploadManager.fileToDataUrl(file);
                             }
                             
-                            await UploadManager.uploadToRemote(uploadData, file.name, twitterUser);
+                            await UploadManager.uploadToRemote(finalUploadData, fileName, twitterUser);
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
-                            // For local storage, use original file for GIFs to preserve animation
+                            // For local storage, use original file for GIFs
                             if (file.type === 'image/gif') {
                                 UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
                             } else {
-                                UploadManager.saveToLocal(processedImage, twitterUser);
+                                UploadManager.saveToLocal(uploadData, twitterUser);
                             }
                             MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
                         }
                     } else {
-                        // For local storage, use original file for GIFs to preserve animation
+                        // For local storage, use original file for GIFs
                         if (file.type === 'image/gif') {
                             UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
                         } else {
-                            UploadManager.saveToLocal(processedImage, twitterUser);
+                            UploadManager.saveToLocal(uploadData, twitterUser);
                         }
                         MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                     }
