@@ -289,31 +289,123 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         },
         
-        validateTwitterHandle(handle) {
+                validateTwitterHandle(handle) {
             if (!handle || !handle.trim()) {
                 throw new Error('Twitter handle is required');
             }
             
-            const twitterPattern = /^@?(\w){1,15}$/;
+                const twitterPattern = /^@?(\w){1,15}$/;
             if (!twitterPattern.test(handle.trim())) {
                 throw new Error('Please enter a valid Twitter username');
             }
             
             return handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`;
         },
-        
+
+        // Smart image compression - maintains quality while optimizing size
+        async compressImage(file) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = () => {
+                    const originalSizeKB = Math.round(file.size / 1024);
+                    
+                    // Smart compression strategy based on original size
+                    let targetSizeKB, maxQuality, minQuality;
+                    
+                    if (originalSizeKB <= 100) {
+                        // Small files: minimal compression, keep quality
+                        targetSizeKB = Math.max(originalSizeKB * 0.9, 80); // 90% of original, min 80KB
+                        maxQuality = 0.98;
+                        minQuality = 0.92;
+                    } else if (originalSizeKB <= 300) {
+                        // Medium files: light compression
+                        targetSizeKB = Math.max(originalSizeKB * 0.7, 150); // 70% of original, min 150KB
+                        maxQuality = 0.95;
+                        minQuality = 0.88;
+                    } else if (originalSizeKB <= 600) {
+                        // Large files: moderate compression
+                        targetSizeKB = Math.max(originalSizeKB * 0.5, 250); // 50% of original, min 250KB
+                        maxQuality = 0.92;
+                        minQuality = 0.82;
+                    } else {
+                        // Very large files: more compression but maintain quality
+                        targetSizeKB = Math.max(originalSizeKB * 0.4, 350); // 40% of original, min 350KB
+                        maxQuality = 0.90;
+                        minQuality = 0.78;
+                    }
+                    
+                    // Calculate optimal dimensions (max 1920px for quality)
+                    let { width, height } = img;
+                    const maxDimension = 1920;
+                    
+                    if (width > maxDimension || height > maxDimension) {
+                        const ratio = Math.min(maxDimension / width, maxDimension / height);
+                        width *= ratio;
+                        height *= ratio;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Try high quality first - if it's already under target, use it
+                    const highQualityDataUrl = canvas.toDataURL('image/jpeg', maxQuality);
+                    const highQualitySizeKB = Math.round((highQualityDataUrl.length * 0.75) / 1024);
+                    
+                    if (highQualitySizeKB <= targetSizeKB) {
+                        console.log(`Image optimized: ${originalSizeKB}KB → ${highQualitySizeKB}KB (${maxQuality * 100}% quality)`);
+                        resolve(highQualityDataUrl);
+                    return;
+                }
+
+                    // Binary search for optimal quality to hit target size
+                    const findOptimalQuality = (minQ, maxQ, attempts = 0) => {
+                        if (attempts > 6) { // Max 6 attempts for performance
+                            return canvas.toDataURL('image/jpeg', Math.max(minQ, 0.75)); // Never go below 75%
+                        }
+                        
+                        const midQ = (minQ + maxQ) / 2;
+                        const dataUrl = canvas.toDataURL('image/jpeg', midQ);
+                        const sizeKB = Math.round((dataUrl.length * 0.75) / 1024);
+                        
+                        if (Math.abs(sizeKB - targetSizeKB) < 25) { // Within 25KB of target
+                            return dataUrl;
+                        }
+                        
+                        if (sizeKB > targetSizeKB) {
+                            return findOptimalQuality(minQ, midQ, attempts + 1);
+                        } else {
+                            return findOptimalQuality(midQ, maxQ, attempts + 1);
+                        }
+                    };
+                    
+                    const compressedDataUrl = findOptimalQuality(minQuality, maxQuality);
+                    const finalSizeKB = Math.round((compressedDataUrl.length * 0.75) / 1024);
+                    const compressionRatio = Math.round((1 - finalSizeKB / originalSizeKB) * 100);
+                    
+                    console.log(`Image compressed: ${originalSizeKB}KB → ${finalSizeKB}KB (${compressionRatio}% reduction)`);
+                    resolve(compressedDataUrl);
+                };
+                
+                img.src = URL.createObjectURL(file);
+            });
+        },
+
         async uploadToRemote(dataUrl, fileName, twitterUser) {
-            const cfg = window.MonadgramConfig || {};
-            const uploadUrl = cfg.EDGE?.UPLOAD_URL;
+                    const cfg = window.MonadgramConfig || {};
+                    const uploadUrl = cfg.EDGE?.UPLOAD_URL;
             
             if (!uploadUrl) {
                 throw new Error('Remote upload not configured');
             }
             
             const response = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json',
+                                method: 'POST',
+                                headers: {
+                                    'content-type': 'application/json',
                     ...(cfg.SUPABASE_ANON_KEY ? { 
                         'apikey': cfg.SUPABASE_ANON_KEY, 
                         'Authorization': `Bearer ${cfg.SUPABASE_ANON_KEY}` 
@@ -342,7 +434,7 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             const pending = StorageManager.getPendingSubmissions();
-            pending.push(submission);
+                        pending.push(submission);
             return StorageManager.setPendingSubmissions(pending);
         },
         
@@ -492,17 +584,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Clear existing hardcoded images first
                 DOM.galleryGrid.innerHTML = '';
                 
-                const cfg = window.MonadgramConfig || {};
-                const listApprovedUrl = cfg.EDGE?.LIST_APPROVED_URL;
+        const cfg = window.MonadgramConfig || {};
+        const listApprovedUrl = cfg.EDGE?.LIST_APPROVED_URL;
                 
                 // First try Edge Function (same as your original)
-                if (listApprovedUrl) {
-                    try {
-                        console.log('Fetching approved list from', listApprovedUrl);
-                        const res = await fetch(listApprovedUrl);
-                        if (res.ok) {
-                            const { items } = await res.json();
-                            console.log('Approved items fetched:', Array.isArray(items) ? items.length : 0);
+        if (listApprovedUrl) {
+            try {
+                console.log('Fetching approved list from', listApprovedUrl);
+                const res = await fetch(listApprovedUrl);
+                if (res.ok) {
+                    const { items } = await res.json();
+                    console.log('Approved items fetched:', Array.isArray(items) ? items.length : 0);
                             
                             // Sort items by created_at DESC (newest first)
                             const sortedItems = items.sort((a, b) => {
@@ -517,28 +609,28 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             // Load initial batch
                             this.loadInitialImages();
-                            return;
-                        } else {
-                            console.warn('list-approved failed with status', res.status);
-                        }
-                    } catch (e) {
-                        console.warn('Remote approved fetch failed, falling back to REST:', e);
-                    }
+                    return;
+                } else {
+                    console.warn('list-approved failed with status', res.status);
                 }
+            } catch (e) {
+                        console.warn('Remote approved fetch failed, falling back to REST:', e);
+            }
+        }
                 
                 // Fallback to REST API (same as your original)
-                if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
-                    try {
-                        const restUrl = `${cfg.SUPABASE_URL}/rest/v1/submissions?select=storage_path,twitter,created_at&status=eq.approved&order=created_at.desc`;
-                        console.log('Fallback fetching REST approved list from', restUrl);
+        if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+            try {
+                const restUrl = `${cfg.SUPABASE_URL}/rest/v1/submissions?select=storage_path,twitter,created_at&status=eq.approved&order=created_at.desc`;
+                console.log('Fallback fetching REST approved list from', restUrl);
                         const res = await fetch(restUrl, { 
                             headers: { 
                                 apikey: cfg.SUPABASE_ANON_KEY, 
                                 Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}` 
                             } 
                         });
-                        if (res.ok) {
-                            const items = await res.json();
+                if (res.ok) {
+                    const items = await res.json();
                             
                             // Sort items by created_at DESC (newest first)
                             const sortedItems = items.sort((a, b) => {
@@ -553,18 +645,18 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             // Load initial batch
                             this.loadInitialImages();
-                            return;
-                        } else {
-                            console.warn('REST approved fetch failed with status', res.status);
-                        }
-                    } catch (e) {
-                        console.warn('REST approved fetch error:', e);
-                    }
+                    return;
+                } else {
+                    console.warn('REST approved fetch failed with status', res.status);
                 }
+            } catch (e) {
+                console.warn('REST approved fetch error:', e);
+            }
+        }
                 
                 // Final fallback to local storage (same as your original)
                 const approved = StorageManager.getApprovedSubmissions();
-                if (!approved || !approved.length) return;
+        if (!approved || !approved.length) return;
                 
                 // Sort local storage items by createdAt DESC (newest first)
                 const sortedApproved = approved.sort((a, b) => {
@@ -772,11 +864,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     const reader = new FileReader();
-                    reader.onload = () => {
+                    reader.onload = async () => {
+                        // Show original preview
                         DOM.imagePreviewImg.src = reader.result;
                         DOM.imagePreview.hidden = false;
                         
-                        // Show file size info
+                        // Show original file size info
                         const fileSizeKB = Math.round(file.size / 1024);
                         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
                         const sizeText = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
@@ -784,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (DOM.fileInfo) {
                             DOM.fileInfo.textContent = `File: ${file.name} (${sizeText})`;
                             DOM.fileInfo.style.display = 'block';
-                            DOM.fileInfo.style.color = file.size <= 1024 * 1024 ? '#10b981' : '#ef4444'; // Green if under 1MB, red if over
+                            DOM.fileInfo.style.color = '#10b981'; // Always green since it passed validation
                         }
                         
                         console.log(`File selected: ${file.name} (${sizeText})`);
@@ -794,7 +887,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         MessageManager.show('Failed to preview image', 'error');
                     };
                     reader.readAsDataURL(file);
-                } else {
+            } else {
                     if (DOM.imagePreview) DOM.imagePreview.hidden = true;
                     if (DOM.imagePreviewImg) DOM.imagePreviewImg.removeAttribute('src');
                     if (DOM.fileInfo) DOM.fileInfo.style.display = 'none';
@@ -823,44 +916,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 UploadManager.validateFile(file);
                 const twitterUser = UploadManager.validateTwitterHandle(twitterValue);
                 
-                const reader = new FileReader();
-                reader.onload = async () => {
-                    try {
-                        const cfg = window.MonadgramConfig || {};
-                        
-                        if (cfg.EDGE?.UPLOAD_URL) {
-                            try {
-                                await UploadManager.uploadToRemote(reader.result, file.name, twitterUser);
-                                MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
-                            } catch (remoteError) {
-                                console.error('Remote upload failed, falling back to local:', remoteError);
-                                UploadManager.saveToLocal(reader.result, twitterUser);
-                                MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
-                            }
-                        } else {
-                            UploadManager.saveToLocal(reader.result, twitterUser);
-                            MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
-                        }
-                        
-                        ModalManager.close();
-                        this.showSuccessOverlay();
-                        
-                    } catch (uploadError) {
-                        ErrorHandler.handleAsyncError('Upload Processing', uploadError);
-                    } finally {
-                        AppState.setUploading(false);
-                        UploadManager.setButtonState(false, 'Upload');
-                    }
-                };
+                // Show compression status
+                UploadManager.setButtonState(true, 'Processing...');
                 
-                reader.onerror = () => {
-                    const error = new Error('Failed to read file');
-                    ErrorHandler.handleAsyncError('FileReader', error);
+                try {
+                    // Automatically compress the image for optimal size and quality
+                    const compressedDataUrl = await UploadManager.compressImage(file);
+                    
+                    // Update button to show upload status
+                    UploadManager.setButtonState(true, 'Uploading...');
+                    
+                    const cfg = window.MonadgramConfig || {};
+                    
+                    if (cfg.EDGE?.UPLOAD_URL) {
+                        try {
+                            await UploadManager.uploadToRemote(compressedDataUrl, file.name, twitterUser);
+                            MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
+                        } catch (remoteError) {
+                            console.error('Remote upload failed, falling back to local:', remoteError);
+                            UploadManager.saveToLocal(compressedDataUrl, twitterUser);
+                            MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
+                        }
+                    } else {
+                        UploadManager.saveToLocal(compressedDataUrl, twitterUser);
+                        MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
+                    }
+                    
+                    ModalManager.close();
+                    this.showSuccessOverlay();
+                    
+                } catch (uploadError) {
+                    ErrorHandler.handleAsyncError('Upload Processing', uploadError);
+                } finally {
                     AppState.setUploading(false);
                     UploadManager.setButtonState(false, 'Upload');
-                };
-                
-                reader.readAsDataURL(file);
+                }
                 
             } catch (error) {
                 ErrorHandler.handleAsyncError('Form Submit', error);
@@ -947,18 +1037,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.handleSwipeGesture();
             }, { passive: true });
             
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 this.addListener(anchor, 'click', function(e) {
-                    e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
-                    if (target) {
-                        target.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start'
-                        });
-                    }
-                });
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
             });
+        });
         },
         
         handleSwipeGesture() {
@@ -1009,9 +1099,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 element.addEventListener('blur', () => {
                     element.classList.remove('focus-visible');
-                });
             });
-        }
+        });
+    }
     };
     
     // =====================================================
@@ -1088,9 +1178,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         })
                         .catch(registrationError => {
                             console.log('SW registration failed: ', registrationError);
-                        });
-                });
-            }
+            });
+        });
+    }
         }
     };
     
