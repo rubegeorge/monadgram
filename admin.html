@@ -30,9 +30,13 @@
       </section>
 
       <section class="admin-panel" id="admin-panel" style="display:none;">
-        <h2 style="margin: 0 0 12px 0;">Pending Submissions</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0;">Admin Panel</h2>
+          <button id="admin-logout" class="btn btn--secondary" style="padding: 8px 16px;">Logout</button>
+        </div>
+        <h3 style="margin: 0 0 12px 0;">Pending Submissions</h3>
         <div class="gallery-grid" id="pending-grid"></div>
-        <h2 style="margin: 24px 0 12px 0;">Approved</h2>
+        <h3 style="margin: 24px 0 12px 0;">Approved</h3>
         <div class="gallery-grid" id="approved-grid"></div>
       </section>
     </main>
@@ -42,8 +46,8 @@
     </footer>
   </div>
 
-  <script src="config.js"></script>
-  <script src="admin.js"></script>
+  <script src="config.js?v=8"></script>
+  <script src="admin.js?v=8"></script>
 </body>
 </html>
 
