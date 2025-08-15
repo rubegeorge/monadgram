@@ -957,6 +957,20 @@ body {
   padding: var(--space-24);
   margin: var(--space-16) 0;
   color: var(--color-text-secondary);
+  /* Position outside grid to prevent layout shifts */
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  /* Ensure it's not part of the grid layout */
+  grid-column: unset;
+  grid-row: unset;
+  /* Make completely invisible for seamless scrolling */
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 .loading-more .loading-spinner {
