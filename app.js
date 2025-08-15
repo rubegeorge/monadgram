@@ -473,6 +473,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
+        // Helper function to convert file to data URL (preserves GIF animation)
+        async fileToDataUrl(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+        },
+        
         resetState() {
             try {
                 this.setButtonState(false, 'Upload');
@@ -972,8 +981,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 UploadManager.setButtonState(true, 'Processing...');
                 
                 try {
-                    // Automatically compress the image for optimal size and quality
-                    const compressedDataUrl = await UploadManager.compressImage(file);
+                    // Process the image (compress if needed, preserve GIFs)
+                    const processedImage = await UploadManager.compressImage(file);
                     
                     // Update button to show upload status
                     UploadManager.setButtonState(true, 'Uploading...');
@@ -982,15 +991,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (cfg.EDGE?.UPLOAD_URL) {
                         try {
-                            await UploadManager.uploadToRemote(compressedDataUrl, file.name, twitterUser);
+                            // For GIFs, we need to convert to data URL for upload
+                            let uploadData;
+                            if (file.type === 'image/gif') {
+                                // Convert GIF to data URL for upload while preserving animation
+                                uploadData = await UploadManager.fileToDataUrl(file);
+                            } else {
+                                uploadData = processedImage; // Use compressed data URL
+                            }
+                            
+                            await UploadManager.uploadToRemote(uploadData, file.name, twitterUser);
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
-                            UploadManager.saveToLocal(compressedDataUrl, twitterUser);
+                            // For local storage, use original file for GIFs to preserve animation
+                            if (file.type === 'image/gif') {
+                                UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
+                            } else {
+                                UploadManager.saveToLocal(processedImage, twitterUser);
+                            }
                             MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
                         }
                     } else {
-                        UploadManager.saveToLocal(compressedDataUrl, twitterUser);
+                        // For local storage, use original file for GIFs to preserve animation
+                        if (file.type === 'image/gif') {
+                            UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
+                        } else {
+                            UploadManager.saveToLocal(processedImage, twitterUser);
+                        }
                         MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                     }
                     
