@@ -302,9 +302,25 @@ document.addEventListener('DOMContentLoaded', function() {
             return handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`;
         },
 
-        // Smart image compression - maintains quality while optimizing size
-        async compressImage(file) {
-            return new Promise((resolve) => {
+                  // Smart image compression - maintains quality while optimizing size
+          async compressImage(file) {
+              // Don't compress GIFs - preserve animation
+              if (file.type === 'image/gif') {
+                  // For GIFs, only check size - don't compress
+                  if (file.size <= 1024 * 1024) {
+                      return file;
+                  } else {
+                      // GIF is too large - reject it
+                      throw new Error('GIF file size must be under 1MB. Please use a smaller GIF or convert to another format.');
+                  }
+              }
+              
+              // For other formats, use existing compression logic
+              if (file.size <= 1024 * 1024) {
+                  return file;
+              }
+              
+              return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
