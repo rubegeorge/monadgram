@@ -511,37 +511,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 return dateB - dateA; // Newest first
                             });
                             
-                            sortedItems.forEach(({ storage_path, twitter }) => {
-                                const card = document.createElement('div');
-                                card.className = 'image-card';
-                                
-                                const container = document.createElement('div');
-                                container.className = 'image-container';
-                                
-                                const img = document.createElement('img');
-                                const srcUrl = cfg.buildPublicUrl ? cfg.buildPublicUrl(storage_path) : storage_path;
-                                img.src = srcUrl;
-                                img.alt = `Monad art by ${twitter}`;
-                                img.loading = 'lazy';
-                                
-                                const overlay = document.createElement('div');
-                                overlay.className = 'image-overlay';
-                                
-                                const title = document.createElement('span');
-                                title.className = 'image-title';
-                                title.textContent = `Art by ${twitter}`;
-                                
-                                overlay.appendChild(title);
-                                container.appendChild(img);
-                                container.appendChild(overlay);
-                                card.appendChild(container);
-                                DOM.galleryGrid.appendChild(card); // Use appendChild instead of prepend
-                                
-                                requestAnimationFrame(() => {
-                                    card.style.animationPlayState = 'running';
-                                    card.classList.add('animate-in');
-                                });
-                            });
+                            // Store all items for pagination instead of displaying immediately
+                            this.paginationState.allItems = sortedItems;
+                            console.log(`Total ${sortedItems.length} images available for pagination`);
+                            
+                            // Load initial batch
+                            this.loadInitialImages();
                             return;
                         } else {
                             console.warn('list-approved failed with status', res.status);
@@ -572,37 +547,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 return dateB - dateA; // Newest first
                             });
                             
-                            sortedItems.forEach(({ storage_path, twitter }) => {
-                                const card = document.createElement('div');
-                                card.className = 'image-card';
-                                
-                                const container = document.createElement('div');
-                                container.className = 'image-container';
-                                
-                                const img = document.createElement('img');
-                                const srcUrl = cfg.buildPublicUrl ? cfg.buildPublicUrl(storage_path) : storage_path;
-                                img.src = srcUrl;
-                                img.alt = `Monad art by ${twitter}`;
-                                img.loading = 'lazy';
-                                
-                                const overlay = document.createElement('div');
-                                overlay.className = 'image-overlay';
-                                
-                                const title = document.createElement('span');
-                                title.className = 'image-title';
-                                title.textContent = `Art by ${twitter}`;
-                                
-                                overlay.appendChild(title);
-                                container.appendChild(img);
-                                container.appendChild(overlay);
-                                card.appendChild(container);
-                                DOM.galleryGrid.appendChild(card); // Use appendChild instead of prepend
-                                
-                                requestAnimationFrame(() => {
-                                    card.style.animationPlayState = 'running';
-                                    card.classList.add('animate-in');
-                                });
-                            });
+                            // Store all items for pagination instead of displaying immediately
+                            this.paginationState.allItems = sortedItems;
+                            console.log(`Total ${sortedItems.length} images available for pagination`);
+                            
+                            // Load initial batch
+                            this.loadInitialImages();
                             return;
                         } else {
                             console.warn('REST approved fetch failed with status', res.status);
@@ -623,38 +573,149 @@ document.addEventListener('DOMContentLoaded', function() {
                     return dateB - dateA; // Newest first
                 });
                 
-                sortedApproved.forEach(({ src, twitter }) => {
-                    const card = document.createElement('div');
-                    card.className = 'image-card';
-                    
-                    const container = document.createElement('div');
-                    container.className = 'image-container';
-                    
-                    const img = document.createElement('img');
-                    img.src = src;
-                    img.alt = `Monad art by ${twitter}`;
-                    img.loading = 'lazy';
-                    
-                    const overlay = document.createElement('div');
-                    overlay.className = 'image-overlay';
-                    
-                    const title = document.createElement('span');
-                    title.className = 'image-title';
-                    title.textContent = `Art by ${twitter}`;
-                    
-                    overlay.appendChild(title);
-                    container.appendChild(img);
-                    container.appendChild(overlay);
-                    card.appendChild(container);
-                    DOM.galleryGrid.appendChild(card); // Use appendChild instead of prepend
-                    
-                    requestAnimationFrame(() => {
-                        card.style.animationPlayState = 'running';
-                        card.classList.add('animate-in');
-                    });
-                });
+                // Store all items for pagination instead of displaying immediately
+                this.paginationState.allItems = sortedApproved;
+                console.log(`Total ${sortedApproved.length} images available for pagination (local storage)`);
+                
+                // Load initial batch
+                this.loadInitialImages();
             } catch (error) {
                 ErrorHandler.logError('GalleryManager.renderApprovedFromStorage', error);
+            }
+        },
+
+        // *** NEW: PAGINATED IMAGE LOADING SYSTEM ***
+        paginationState: {
+            allItems: [],
+            currentIndex: 0,
+            itemsPerLoad: 8,  // Load 2 rows (4x2) at a time
+            initialLoad: 16,   // Show first 4 rows (4x4) initially
+            isLoading: false,
+            hasMore: true
+        },
+
+        // Load initial batch of images
+        loadInitialImages() {
+            const items = this.paginationState.allItems.slice(0, this.paginationState.initialLoad);
+            items.forEach(item => this.createImageCard(item));
+            
+            // Update state
+            this.paginationState.currentIndex = this.paginationState.initialLoad;
+            this.paginationState.hasMore = this.paginationState.currentIndex < this.paginationState.allItems.length;
+            
+            console.log(`Loaded initial ${items.length} images. ${this.paginationState.allItems.length - items.length} remaining.`);
+        },
+
+        // Load more images when scrolling
+        loadMoreImages() {
+            if (this.paginationState.isLoading || !this.paginationState.hasMore) return;
+            
+            this.paginationState.isLoading = true;
+            
+            const startIndex = this.paginationState.currentIndex;
+            const endIndex = Math.min(startIndex + this.paginationState.itemsPerLoad, this.paginationState.allItems.length);
+            const items = this.paginationState.allItems.slice(startIndex, endIndex);
+            
+            // Add loading indicator
+            this.showLoadingIndicator();
+            
+            // Simulate slight delay for smooth UX
+            setTimeout(() => {
+                items.forEach(item => this.createImageCard(item));
+                
+                // Update state
+                this.paginationState.currentIndex = endIndex;
+                this.paginationState.hasMore = endIndex < this.paginationState.allItems.length;
+                this.paginationState.isLoading = false;
+                
+                // Hide loading indicator
+                this.hideLoadingIndicator();
+                
+                console.log(`Loaded ${items.length} more images. ${this.paginationState.allItems.length - endIndex} remaining.`);
+            }, 300);
+        },
+
+        // Create individual image card
+        createImageCard(item) {
+            const { storage_path, twitter, src } = item;
+            const cfg = window.MonadgramConfig || {};
+            
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            
+            const container = document.createElement('div');
+            container.className = 'image-container';
+            
+            const img = document.createElement('img');
+            const imgSrc = storage_path ? (cfg.buildPublicUrl ? cfg.buildPublicUrl(storage_path) : storage_path) : src;
+            img.src = imgSrc;
+            img.alt = `Monad art by ${twitter}`;
+            img.loading = 'lazy';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'image-overlay';
+            
+            const title = document.createElement('span');
+            title.className = 'image-title';
+            title.textContent = `Art by ${twitter}`;
+            
+            overlay.appendChild(title);
+            container.appendChild(img);
+            container.appendChild(overlay);
+            card.appendChild(container);
+            DOM.galleryGrid.appendChild(card);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                card.style.animationPlayState = 'running';
+                card.classList.add('animate-in');
+            });
+        },
+
+        // Setup infinite scroll detection
+        setupInfiniteScroll() {
+            const scrollObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && !this.paginationState.isLoading && this.paginationState.hasMore) {
+                        this.loadMoreImages();
+                    }
+                });
+            }, {
+                rootMargin: '100px 0px', // Start loading 100px before reaching bottom
+                threshold: 0.1
+            });
+            
+            // Create and observe a sentinel element at the bottom
+            const sentinel = document.createElement('div');
+            sentinel.className = 'scroll-sentinel';
+            sentinel.style.height = '20px';
+            sentinel.style.width = '100%';
+            DOM.galleryGrid.appendChild(sentinel);
+            
+            scrollObserver.observe(sentinel);
+            AppState.observers.add(scrollObserver);
+        },
+
+        // Show loading indicator
+        showLoadingIndicator() {
+            let loadingEl = document.querySelector('.loading-more');
+            if (!loadingEl) {
+                loadingEl = document.createElement('div');
+                loadingEl.className = 'loading-more';
+                loadingEl.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <p>Loading more Monad art...</p>
+                `;
+                DOM.galleryGrid.appendChild(loadingEl);
+            }
+            loadingEl.style.display = 'block';
+        },
+
+        // Hide loading indicator
+        hideLoadingIndicator() {
+            const loadingEl = document.querySelector('.loading-more');
+            if (loadingEl) {
+                loadingEl.style.display = 'none';
             }
         }
     };
@@ -1056,6 +1117,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             GalleryManager.setupCustomLazyLoading();
             GalleryManager.setupScrollAnimations();
+            GalleryManager.setupInfiniteScroll(); // Initialize pagination
             
             // *** FIXED: Admin button only shows on localhost ***
             AdminManager.setupAdminButton();
