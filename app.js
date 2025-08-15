@@ -480,13 +480,22 @@ document.addEventListener('DOMContentLoaded', function() {
         open() {
             try {
                 if (DOM.uploadModal && DOM.shareArtBtn) {
+                    // Prevent body scrolling when modal is open
+                    document.body.style.overflow = 'hidden';
+                    
                     DOM.uploadModal.hidden = false;
                     DOM.shareArtBtn.setAttribute('aria-expanded', 'true');
                     DOM.uploadModal.setAttribute('aria-hidden', 'false');
                     
-                    if (DOM.fileInput) {
-                        DOM.fileInput.focus();
-                    }
+                    // Ensure modal is centered in current viewport
+                    DOM.uploadModal.scrollTop = 0;
+                    
+                    // Focus on first input after a short delay
+                    setTimeout(() => {
+                        if (DOM.fileInput) {
+                            DOM.fileInput.focus();
+                        }
+                    }, 100);
                 }
             } catch (error) {
                 ErrorHandler.logError('ModalManager.open', error);
@@ -496,6 +505,9 @@ document.addEventListener('DOMContentLoaded', function() {
         close() {
             try {
                 if (DOM.uploadModal && DOM.shareArtBtn && DOM.uploadForm) {
+                    // Restore body scrolling
+                    document.body.style.overflow = '';
+                    
                     DOM.uploadModal.hidden = true;
                     DOM.shareArtBtn.setAttribute('aria-expanded', 'false');
                     DOM.uploadModal.setAttribute('aria-hidden', 'true');
@@ -696,6 +708,11 @@ document.addEventListener('DOMContentLoaded', function() {
             this.paginationState.hasMore = this.paginationState.currentIndex < this.paginationState.allItems.length;
             
             console.log(`Loaded initial ${items.length} images. ${this.paginationState.allItems.length - items.length} remaining.`);
+            
+            // Setup infinite scroll after initial images are loaded
+            setTimeout(() => {
+                this.setupInfiniteScroll();
+            }, 500);
         },
 
         // Load more images when scrolling
@@ -722,6 +739,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Hide loading indicator
                 this.hideLoadingIndicator();
+                
+                // Move sentinel to the very end after adding new images
+                const sentinel = document.querySelector('.scroll-sentinel');
+                if (sentinel) {
+                    DOM.galleryGrid.appendChild(sentinel);
+                }
                 
                 console.log(`Loaded ${items.length} more images. ${this.paginationState.allItems.length - endIndex} remaining.`);
             }, 300);
@@ -766,9 +789,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Setup infinite scroll detection
         setupInfiniteScroll() {
+            console.log('Setting up infinite scroll...', {
+                hasMore: this.paginationState.hasMore,
+                currentIndex: this.paginationState.currentIndex,
+                totalItems: this.paginationState.allItems.length
+            });
+            
+            // Remove any existing sentinel first
+            const existingSentinel = document.querySelector('.scroll-sentinel');
+            if (existingSentinel) {
+                existingSentinel.remove();
+            }
+            
             const scrollObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
+                    console.log('Sentinel intersecting:', entry.isIntersecting, {
+                        isLoading: this.paginationState.isLoading,
+                        hasMore: this.paginationState.hasMore
+                    });
                     if (entry.isIntersecting && !this.paginationState.isLoading && this.paginationState.hasMore) {
+                        console.log('Loading more images...');
                         this.loadMoreImages();
                     }
                 });
@@ -777,15 +817,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 threshold: 0.1
             });
             
-            // Create and observe a sentinel element at the bottom
+            // Create and observe a sentinel element at the very bottom
             const sentinel = document.createElement('div');
             sentinel.className = 'scroll-sentinel';
-            sentinel.style.height = '20px';
-            sentinel.style.width = '100%';
+            sentinel.style.cssText = 'height: 1px; width: 100%; opacity: 0; pointer-events: none;';
+            
+            // Add sentinel as the very last element in the gallery
             DOM.galleryGrid.appendChild(sentinel);
             
             scrollObserver.observe(sentinel);
             AppState.observers.add(scrollObserver);
+            
+            console.log('Infinite scroll setup complete, invisible sentinel added');
         },
 
         // Show loading indicator
@@ -795,8 +838,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadingEl = document.createElement('div');
                 loadingEl.className = 'loading-more';
                 loadingEl.innerHTML = `
-                    <div class="loading-spinner"></div>
-                    <p>Loading more Monad art...</p>
+                    <div class="hedgehog-pacman-container" style="width: 200px; height: 70px;">
+                        <div class="hedgehog-pacman" style="width: 50px; height: 50px;"></div>
+                        <div class="pacman-dots">
+                            <div class="pacman-dot"></div>
+                            <div class="pacman-dot"></div>
+                            <div class="pacman-dot"></div>
+                            <div class="pacman-dot"></div>
+                        </div>
+                    </div>
+                    <p>wen mainnet..</p>
                 `;
                 DOM.galleryGrid.appendChild(loadingEl);
             }
@@ -1237,7 +1288,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             GalleryManager.setupCustomLazyLoading();
             GalleryManager.setupScrollAnimations();
-            GalleryManager.setupInfiniteScroll(); // Initialize pagination
+            // Note: setupInfiniteScroll is called after images are loaded
             
             // *** FIXED: Admin button only shows on localhost ***
             AdminManager.setupAdminButton();
