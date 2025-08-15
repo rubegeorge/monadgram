@@ -833,25 +833,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Show loading indicator
         showLoadingIndicator() {
-            let loadingEl = document.querySelector('.loading-more');
-            if (!loadingEl) {
-                loadingEl = document.createElement('div');
-                loadingEl.className = 'loading-more';
-                loadingEl.innerHTML = `
-                    <div class="hedgehog-pacman-container" style="width: 200px; height: 70px;">
-                        <div class="hedgehog-pacman" style="width: 50px; height: 50px;"></div>
-                        <div class="pacman-dots">
-                            <div class="pacman-dot"></div>
-                            <div class="pacman-dot"></div>
-                            <div class="pacman-dot"></div>
-                            <div class="pacman-dot"></div>
-                        </div>
-                    </div>
-                    <p>wen mainnet..</p>
-                `;
-                DOM.galleryGrid.appendChild(loadingEl);
+            const loadingEl = document.getElementById('loading-more');
+            if (loadingEl) {
+                loadingEl.style.display = 'block';
             }
-            loadingEl.style.display = 'block';
         },
 
         // Hide loading indicator
