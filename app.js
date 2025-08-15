@@ -489,6 +489,9 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 if (!DOM.galleryGrid) return;
                 
+                // Clear existing hardcoded images first
+                DOM.galleryGrid.innerHTML = '';
+                
                 const cfg = window.MonadgramConfig || {};
                 const listApprovedUrl = cfg.EDGE?.LIST_APPROVED_URL;
                 
@@ -500,7 +503,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (res.ok) {
                             const { items } = await res.json();
                             console.log('Approved items fetched:', Array.isArray(items) ? items.length : 0);
-                            items.forEach(({ storage_path, twitter }) => {
+                            
+                            // Sort items by created_at DESC (newest first)
+                            const sortedItems = items.sort((a, b) => {
+                                const dateA = new Date(a.created_at || a.createdAt || 0);
+                                const dateB = new Date(b.created_at || b.createdAt || 0);
+                                return dateB - dateA; // Newest first
+                            });
+                            
+                            sortedItems.forEach(({ storage_path, twitter }) => {
                                 const card = document.createElement('div');
                                 card.className = 'image-card';
                                 
@@ -524,7 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 container.appendChild(img);
                                 container.appendChild(overlay);
                                 card.appendChild(container);
-                                DOM.galleryGrid.prepend(card);
+                                DOM.galleryGrid.appendChild(card); // Use appendChild instead of prepend
                                 
                                 requestAnimationFrame(() => {
                                     card.style.animationPlayState = 'running';
@@ -536,7 +547,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             console.warn('list-approved failed with status', res.status);
                         }
                     } catch (e) {
-                        console.warn('Remote approved fetch failed, falling back to local storage:', e);
+                        console.warn('Remote approved fetch failed, falling back to REST:', e);
                     }
                 }
                 
@@ -553,7 +564,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                         if (res.ok) {
                             const items = await res.json();
-                            items.forEach(({ storage_path, twitter }) => {
+                            
+                            // Sort items by created_at DESC (newest first)
+                            const sortedItems = items.sort((a, b) => {
+                                const dateA = new Date(a.created_at || a.createdAt || 0);
+                                const dateB = new Date(b.created_at || b.createdAt || 0);
+                                return dateB - dateA; // Newest first
+                            });
+                            
+                            sortedItems.forEach(({ storage_path, twitter }) => {
                                 const card = document.createElement('div');
                                 card.className = 'image-card';
                                 
@@ -577,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 container.appendChild(img);
                                 container.appendChild(overlay);
                                 card.appendChild(container);
-                                DOM.galleryGrid.prepend(card);
+                                DOM.galleryGrid.appendChild(card); // Use appendChild instead of prepend
                                 
                                 requestAnimationFrame(() => {
                                     card.style.animationPlayState = 'running';
@@ -597,8 +616,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const approved = StorageManager.getApprovedSubmissions();
                 if (!approved || !approved.length) return;
                 
-                for (let i = approved.length - 1; i >= 0; i -= 1) {
-                    const { src, twitter } = approved[i];
+                // Sort local storage items by createdAt DESC (newest first)
+                const sortedApproved = approved.sort((a, b) => {
+                    const dateA = new Date(a.createdAt || a.created_at || 0);
+                    const dateB = new Date(b.createdAt || b.created_at || 0);
+                    return dateB - dateA; // Newest first
+                });
+                
+                sortedApproved.forEach(({ src, twitter }) => {
                     const card = document.createElement('div');
                     card.className = 'image-card';
                     
@@ -621,13 +646,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.appendChild(img);
                     container.appendChild(overlay);
                     card.appendChild(container);
-                    DOM.galleryGrid.prepend(card);
+                    DOM.galleryGrid.appendChild(card); // Use appendChild instead of prepend
                     
                     requestAnimationFrame(() => {
                         card.style.animationPlayState = 'running';
                         card.classList.add('animate-in');
                     });
-                }
+                });
             } catch (error) {
                 ErrorHandler.logError('GalleryManager.renderApprovedFromStorage', error);
             }
@@ -1102,6 +1127,3 @@ document.addEventListener('DOMContentLoaded', function() {
     // =====================================================
     init();
 });
-
-
-
