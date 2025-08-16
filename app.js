@@ -304,11 +304,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                           // Smart image compression - maintains quality while optimizing size
         async compressImage(file) {
-            console.log('compressImage called for:', file.type, 'size:', file.size);
-            
             // Don't compress GIFs - preserve animation
             if (file.type === 'image/gif') {
-                console.log('GIF detected, bypassing compression');
                 // For GIFs, only check size - don't compress
                 if (file.size <= 1024 * 1024) {
                     return file;
@@ -320,13 +317,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // For other formats, use existing compression logic
             if (file.size <= 1024 * 1024) {
-                console.log('File already under 1MB, no compression needed');
                 return file;
             }
             
-            console.log('Starting compression for file type:', file.type);
-              
-              return new Promise((resolve) => {
+            return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
@@ -380,8 +374,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (highQualitySizeKB <= targetSizeKB) {
                         console.log(`Image optimized: ${originalSizeKB}KB → ${highQualitySizeKB}KB (${maxQuality * 100}% quality)`);
                         resolve(highQualityDataUrl);
-                    return;
-                }
+                        return;
+                    }
 
                     // Binary search for optimal quality to hit target size
                     const findOptimalQuality = (minQ, maxQ, attempts = 0) => {
@@ -1017,7 +1011,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         // Other formats: Use compression
                         uploadData = await UploadManager.compressImage(file);
-                        console.log('Non-GIF compressed, size:', uploadData.length);
                     }
                     
                     // Update button to show upload status
@@ -1031,22 +1024,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             let finalUploadData = uploadData;
                             if (file.type === 'image/gif') {
                                 finalUploadData = await UploadManager.fileToDataUrl(file);
-                                console.log('GIF converted to data URL for upload');
-                            } else {
-                                // For compressed images, uploadData is already a data URL
-                                finalUploadData = uploadData;
-                                console.log('Using compressed data URL for upload');
                             }
                             
-                            console.log('Uploading to remote:', {
-                                type: file.type,
-                                fileName: fileName,
-                                dataLength: finalUploadData.length,
-                                isGif: file.type === 'image/gif'
-                            });
-                            
                             await UploadManager.uploadToRemote(finalUploadData, fileName, twitterUser);
-                            console.log('Upload successful!');
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
