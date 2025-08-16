@@ -1001,17 +1001,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 try {
                     // Handle GIFs separately - no compression, no processing
-                    let uploadData;
                     let fileName = file.name;
-                    
-                    if (file.type === 'image/gif') {
-                        // GIFs: Use original file directly, no compression, no conversion
-                        uploadData = file;
-                        console.log('GIF upload - using original file, no processing');
-                    } else {
-                        // Other formats: Use compression
-                        uploadData = await UploadManager.compressImage(file);
-                    }
                     
                     // Update button to show upload status
                     UploadManager.setButtonState(true, 'Uploading...');
@@ -1020,31 +1010,39 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (cfg.EDGE?.UPLOAD_URL) {
                         try {
-                            // For GIFs, convert to data URL only at the last moment for upload
-                            let finalUploadData = uploadData;
+                            // For GIFs, convert to data URL for upload
+                            let finalUploadData;
                             if (file.type === 'image/gif') {
                                 finalUploadData = await UploadManager.fileToDataUrl(file);
+                                console.log('GIF upload - converted to data URL for upload');
+                            } else {
+                                // Other formats: Use compression
+                                finalUploadData = await UploadManager.compressImage(file);
                             }
                             
                             await UploadManager.uploadToRemote(finalUploadData, fileName, twitterUser);
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
-                            // For local storage, use original file for GIFs
+                            // For local storage, convert to data URL for all formats
+                            let localData;
                             if (file.type === 'image/gif') {
-                                UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
+                                localData = await UploadManager.fileToDataUrl(file);
                             } else {
-                                UploadManager.saveToLocal(uploadData, twitterUser);
+                                localData = await UploadManager.compressImage(file);
                             }
+                            UploadManager.saveToLocal(localData, twitterUser);
                             MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
                         }
                     } else {
-                        // For local storage, use original file for GIFs
+                        // For local storage, convert to data URL for all formats
+                        let localData;
                         if (file.type === 'image/gif') {
-                            UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
+                            localData = await UploadManager.fileToDataUrl(file);
                         } else {
-                            UploadManager.saveToLocal(uploadData, twitterUser);
+                            localData = await UploadManager.compressImage(file);
                         }
+                        UploadManager.saveToLocal(localData, twitterUser);
                         MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                     }
                     
