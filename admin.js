@@ -77,6 +77,32 @@ document.addEventListener('DOMContentLoaded', () => {
     panelSection.style.display = 'none';
   }
 
+  // Main render function
+  async function render() {
+    try {
+      // Clear existing selections
+      selectedPending.clear();
+      selectedApproved.clear();
+      
+      // Fetch data from both sources
+      const pending = await apiListPending();
+      const approved = await apiListApproved();
+      
+      // Render grids
+      renderGrid(pendingGrid, pending, true);
+      renderGrid(approvedGrid, approved, false);
+      
+      // Update bulk action visibility
+      updateBulkActionVisibility();
+      updateSelectAllCheckbox(true);
+      updateSelectAllCheckbox(false);
+      
+      console.log('Admin panel rendered:', { pending: pending.length, approved: approved.length });
+    } catch (error) {
+      console.error('Error rendering admin panel:', error);
+    }
+  }
+
   loginBtn.addEventListener('click', () => {
     const val = passwordInput.value || '';
     login(val);
@@ -210,17 +236,40 @@ document.addEventListener('DOMContentLoaded', () => {
       const container = document.createElement('div');
       container.className = 'image-container';
       const img = document.createElement('img');
-      // Prefer storage_path from Supabase; fallback to local 'src' if present
-      const cfg = window.MonadgramConfig || {};
-      const publicUrl = item.storage_path && cfg.buildPublicUrl ? cfg.buildPublicUrl(item.storage_path) : item.src;
-      img.src = publicUrl;
-      img.alt = `Submission by ${item.twitter}`;
+      
+      // Enhanced image source handling with new metadata
+      let imgSrc;
+      if (item.storage_path && window.MonadgramConfig?.buildPublicUrl) {
+        // Supabase storage path
+        imgSrc = window.MonadgramConfig.buildPublicUrl(item.storage_path);
+      } else if (item.src) {
+        // Local storage data URL
+        imgSrc = item.src;
+      } else {
+        // Fallback placeholder
+        imgSrc = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNjY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+      }
+      
+      img.src = imgSrc;
+      img.alt = `Submission by ${item.twitter || 'Unknown'}`;
       img.loading = 'lazy';
+      
+      // Enhanced metadata display
       const overlay = document.createElement('div');
       overlay.className = 'image-overlay';
       const title = document.createElement('span');
       title.className = 'image-title';
-      title.textContent = `By ${item.twitter}`;
+      
+      // Show enhanced information including file type
+      let titleText = `By ${item.twitter || 'Unknown'}`;
+      if (item.fileType) {
+        titleText += ` (${item.fileType.split('/')[1].toUpperCase()})`;
+      }
+      if (item.isGif) {
+        titleText += ' 🎬'; // GIF indicator
+      }
+      title.textContent = titleText;
+      
       overlay.appendChild(title);
       container.appendChild(img);
       container.appendChild(overlay);
@@ -415,6 +464,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!res.ok) return getApprovedSubmissions();
     return res.json();
   }
+
+  // Utility function to clear localStorage for testing
+  function clearLocalStorage() {
+    localStorage.removeItem(PENDING_KEY);
+    localStorage.removeItem(APPROVED_KEY);
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    console.log('LocalStorage cleared for testing');
+    alert('LocalStorage cleared! Please refresh the page.');
+  }
+
+  // Add clear button for testing (you can remove this in production)
+  const clearBtn = document.createElement('button');
+  clearBtn.textContent = 'Clear Storage (Testing)';
+  clearBtn.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;';
+  clearBtn.addEventListener('click', clearLocalStorage);
+  document.body.appendChild(clearBtn);
 });
+
 
 
