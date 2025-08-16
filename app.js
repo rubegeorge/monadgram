@@ -306,22 +306,26 @@ document.addEventListener('DOMContentLoaded', function() {
         async compressImage(file) {
             console.log('compressImage called for:', file.type, 'size:', file.size);
             
+            const maxSize = 1024 * 1024;
+            
             // Don't compress GIFs - preserve animation
             if (file.type === 'image/gif') {
                 console.log('GIF detected, bypassing compression');
                 // For GIFs, only check size - don't compress
-                if (file.size <= 1024 * 1024) {
-                    return file;
-                } else {
+                if (file.size > maxSize) {
                     // GIF is too large - reject it
                     throw new Error('GIF file size must be under 1MB. Please use a smaller GIF or convert to another format.');
                 }
+                console.log('Converting GIF to data URL');
+                const dataUrl = await this.fileToDataUrl(file);
+                return { dataUrl, mimeType: 'image/gif', wasCompressed: false };
             }
             
-            // For other formats, use existing compression logic
-            if (file.size <= 1024 * 1024) {
-                console.log('File already under 1MB, no compression needed');
-                return file;
+            // For other formats, convert to data URL if already under size
+            if (file.size <= maxSize) {
+                console.log('File already under 1MB, no compression needed, converting to data URL');
+                const dataUrl = await this.fileToDataUrl(file);
+                return { dataUrl, mimeType: file.type, wasCompressed: false };
             }
             
             console.log('Starting compression for file type:', file.type);
@@ -379,9 +383,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (highQualitySizeKB <= targetSizeKB) {
                         console.log(`Image optimized: ${originalSizeKB}KB → ${highQualitySizeKB}KB (${maxQuality * 100}% quality)`);
-                        resolve(highQualityDataUrl);
-                    return;
-                }
+                        resolve({ dataUrl: highQualityDataUrl, mimeType: 'image/jpeg', wasCompressed: true });
+                        return;
+                    }
 
                     // Binary search for optimal quality to hit target size
                     const findOptimalQuality = (minQ, maxQ, attempts = 0) => {
@@ -409,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const compressionRatio = Math.round((1 - finalSizeKB / originalSizeKB) * 100);
                     
                     console.log(`Image compressed: ${originalSizeKB}KB → ${finalSizeKB}KB (${compressionRatio}% reduction)`);
-                    resolve(compressedDataUrl);
+                    resolve({ dataUrl: compressedDataUrl, mimeType: 'image/jpeg', wasCompressed: true });
                 };
                 
                 img.src = URL.createObjectURL(file);
@@ -1006,26 +1010,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 UploadManager.setButtonState(true, 'Processing...');
                 
                 try {
-                    // Handle GIFs separately - no compression, no processing
-                    let uploadData;
+                    const result = await UploadManager.compressImage(file);
                     let fileName = file.name;
                     
-                    if (file.type === 'image/gif') {
-                        // GIFs: Use original file directly, no compression, no conversion
-                        uploadData = file;
-                        console.log('GIF upload - using original file, no processing');
-                    } else {
-                        // Other formats: Use compression
-                        uploadData = await UploadManager.compressImage(file);
-                        // Since compression outputs JPEG, adjust fileName extension to .jpg
+                    if (result.wasCompressed) {
                         const extMatch = fileName.match(/\.\w+$/);
                         if (extMatch) {
                             fileName = fileName.replace(extMatch[0], '.jpg');
                         } else {
                             fileName += '.jpg';
                         }
-                        console.log('Non-GIF compressed, adjusted fileName to:', fileName);
+                        console.log('Compressed image, adjusted fileName to:', fileName);
                     }
+                    
+                    const uploadData = result.dataUrl;
                     
                     // Update button to show upload status
                     UploadManager.setButtonState(true, 'Uploading...');
@@ -1034,44 +1032,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (cfg.EDGE?.UPLOAD_URL) {
                         try {
-                            // For GIFs, convert to data URL only at the last moment for upload
-                            let finalUploadData = uploadData;
-                            if (file.type === 'image/gif') {
-                                finalUploadData = await UploadManager.fileToDataUrl(file);
-                                console.log('GIF converted to data URL for upload');
-                            } else {
-                                // For compressed images, uploadData is already a data URL
-                                finalUploadData = uploadData;
-                                console.log('Using compressed data URL for upload');
-                            }
-                            
                             console.log('Uploading to remote:', {
-                                type: file.type,
+                                type: result.mimeType,
                                 fileName: fileName,
-                                dataLength: finalUploadData.length,
-                                isGif: file.type === 'image/gif'
+                                dataLength: uploadData.length,
+                                wasCompressed: result.wasCompressed
                             });
                             
-                            await UploadManager.uploadToRemote(finalUploadData, fileName, twitterUser);
+                            await UploadManager.uploadToRemote(uploadData, fileName, twitterUser);
                             console.log('Upload successful!');
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
-                            // For local storage, use original file for GIFs
-                            if (file.type === 'image/gif') {
-                                UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
-                            } else {
-                                UploadManager.saveToLocal(uploadData, twitterUser);
-                            }
+                            UploadManager.saveToLocal(uploadData, twitterUser);
                             MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
                         }
                     } else {
-                        // For local storage, use original file for GIFs
-                        if (file.type === 'image/gif') {
-                            UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
-                        } else {
-                            UploadManager.saveToLocal(uploadData, twitterUser);
-                        }
+                        UploadManager.saveToLocal(uploadData, twitterUser);
                         MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                     }
                     
