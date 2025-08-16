@@ -321,14 +321,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return { dataUrl, mimeType: 'image/gif', wasCompressed: false };
             }
             
-            // For other formats, convert to data URL if already under size
-            if (file.size <= maxSize) {
-                console.log('File already under 1MB, no compression needed, converting to data URL');
-                const dataUrl = await this.fileToDataUrl(file);
-                return { dataUrl, mimeType: file.type, wasCompressed: false };
-            }
-            
-            console.log('Starting compression for file type:', file.type);
+            // For non-GIF formats, always convert to JPEG using canvas
+            console.log('Starting JPEG conversion/compression for file type:', file.type);
               
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
@@ -342,23 +336,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     let targetSizeKB, maxQuality, minQuality;
                     
                     if (originalSizeKB <= 100) {
-                        // Small files: minimal compression, keep quality
-                        targetSizeKB = Math.max(originalSizeKB * 0.9, 80); // 90% of original, min 80KB
+                        targetSizeKB = Math.max(originalSizeKB * 0.9, 80);
                         maxQuality = 0.98;
                         minQuality = 0.92;
                     } else if (originalSizeKB <= 300) {
-                        // Medium files: light compression
-                        targetSizeKB = Math.max(originalSizeKB * 0.7, 150); // 70% of original, min 150KB
+                        targetSizeKB = Math.max(originalSizeKB * 0.7, 150);
                         maxQuality = 0.95;
                         minQuality = 0.88;
                     } else if (originalSizeKB <= 600) {
-                        // Large files: moderate compression
-                        targetSizeKB = Math.max(originalSizeKB * 0.5, 250); // 50% of original, min 250KB
+                        targetSizeKB = Math.max(originalSizeKB * 0.5, 250);
                         maxQuality = 0.92;
                         minQuality = 0.82;
                     } else {
-                        // Very large files: more compression but maintain quality
-                        targetSizeKB = Math.max(originalSizeKB * 0.4, 350); // 40% of original, min 350KB
+                        targetSizeKB = Math.max(originalSizeKB * 0.4, 350);
                         maxQuality = 0.90;
                         minQuality = 0.78;
                     }
