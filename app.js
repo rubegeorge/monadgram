@@ -289,12 +289,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         },
         
-                validateTwitterHandle(handle) {
+        validateTwitterHandle(handle) {
             if (!handle || !handle.trim()) {
                 throw new Error('Twitter handle is required');
             }
             
-                const twitterPattern = /^@?(\w){1,15}$/;
+            const twitterPattern = /^@?(\w){1,15}$/;
             if (!twitterPattern.test(handle.trim())) {
                 throw new Error('Please enter a valid Twitter username');
             }
@@ -302,10 +302,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`;
         },
 
-                          // Smart image compression - maintains quality while optimizing size
+        // Smart image compression - maintains quality while optimizing size
         async compressImage(file) {
+            console.log('compressImage called for:', file.type, 'size:', file.size);
+            
             // Don't compress GIFs - preserve animation
             if (file.type === 'image/gif') {
+                console.log('GIF detected, bypassing compression');
                 // For GIFs, only check size - don't compress
                 if (file.size <= 1024 * 1024) {
                     return file;
@@ -317,9 +320,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // For other formats, use existing compression logic
             if (file.size <= 1024 * 1024) {
+                console.log('File already under 1MB, no compression needed');
                 return file;
             }
             
+            console.log('Starting compression for file type:', file.type);
+              
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
@@ -374,8 +380,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (highQualitySizeKB <= targetSizeKB) {
                         console.log(`Image optimized: ${originalSizeKB}KB → ${highQualitySizeKB}KB (${maxQuality * 100}% quality)`);
                         resolve(highQualityDataUrl);
-                        return;
-                    }
+                    return;
+                }
 
                     // Binary search for optimal quality to hit target size
                     const findOptimalQuality = (minQ, maxQ, attempts = 0) => {
@@ -411,17 +417,17 @@ document.addEventListener('DOMContentLoaded', function() {
         },
 
         async uploadToRemote(dataUrl, fileName, twitterUser) {
-                    const cfg = window.MonadgramConfig || {};
-                    const uploadUrl = cfg.EDGE?.UPLOAD_URL;
+            const cfg = window.MonadgramConfig || {};
+            const uploadUrl = cfg.EDGE?.UPLOAD_URL;
             
             if (!uploadUrl) {
                 throw new Error('Remote upload not configured');
             }
             
             const response = await fetch(uploadUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'content-type': 'application/json',
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
                     ...(cfg.SUPABASE_ANON_KEY ? { 
                         'apikey': cfg.SUPABASE_ANON_KEY, 
                         'Authorization': `Bearer ${cfg.SUPABASE_ANON_KEY}` 
@@ -450,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             const pending = StorageManager.getPendingSubmissions();
-                        pending.push(submission);
+            pending.push(submission);
             return StorageManager.setPendingSubmissions(pending);
         },
         
@@ -1011,6 +1017,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         // Other formats: Use compression
                         uploadData = await UploadManager.compressImage(file);
+                        // Since compression outputs JPEG, adjust fileName extension to .jpg
+                        const extMatch = fileName.match(/\.\w+$/);
+                        if (extMatch) {
+                            fileName = fileName.replace(extMatch[0], '.jpg');
+                        } else {
+                            fileName += '.jpg';
+                        }
+                        console.log('Non-GIF compressed, adjusted fileName to:', fileName);
                     }
                     
                     // Update button to show upload status
@@ -1024,9 +1038,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             let finalUploadData = uploadData;
                             if (file.type === 'image/gif') {
                                 finalUploadData = await UploadManager.fileToDataUrl(file);
+                                console.log('GIF converted to data URL for upload');
+                            } else {
+                                // For compressed images, uploadData is already a data URL
+                                finalUploadData = uploadData;
+                                console.log('Using compressed data URL for upload');
                             }
                             
+                            console.log('Uploading to remote:', {
+                                type: file.type,
+                                fileName: fileName,
+                                dataLength: finalUploadData.length,
+                                isGif: file.type === 'image/gif'
+                            });
+                            
                             await UploadManager.uploadToRemote(finalUploadData, fileName, twitterUser);
+                            console.log('Upload successful!');
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
