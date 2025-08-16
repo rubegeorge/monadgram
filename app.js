@@ -267,74 +267,74 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    // =====================================================
-    // UPLOAD MANAGER
+        // =====================================================
+    // FIXED UPLOAD MANAGER - PROPER IMAGE PROCESSING
     // =====================================================
     const UploadManager = {
         validateFile(file) {
             if (!file) {
                 throw new Error('No file selected');
             }
-            
+        
             const maxSize = 1 * 1024 * 1024; // 1MB
             if (file.size > maxSize) {
                 throw new Error('File size must be less than 1MB. Please compress your image and try again.');
             }
-            
+        
             const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             if (!allowedTypes.includes(file.type)) {
                 throw new Error('File must be an image (JPEG, PNG, GIF, or WebP)');
             }
-            
+        
             return true;
         },
-        
+    
         validateTwitterHandle(handle) {
             if (!handle || !handle.trim()) {
                 throw new Error('Twitter handle is required');
             }
-            
+        
             const twitterPattern = /^@?(\w){1,15}$/;
             if (!twitterPattern.test(handle.trim())) {
                 throw new Error('Please enter a valid Twitter username');
             }
-            
+        
             return handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`;
         },
 
-        // Smart image compression - maintains quality while optimizing size
+        // *** FIXED: Smart image compression that returns consistent format ***
         async compressImage(file) {
             console.log('compressImage called for:', file.type, 'size:', file.size);
-            
-            const maxSize = 1024 * 1024;
-            
-            // Don't compress GIFs - preserve animation
+        
+            // Don't compress GIFs - preserve animation, return as data URL
             if (file.type === 'image/gif') {
-                console.log('GIF detected, bypassing compression');
-                // For GIFs, only check size - don't compress
-                if (file.size > maxSize) {
-                    // GIF is too large - reject it
+                console.log('GIF detected, converting to data URL without compression');
+                if (file.size <= 1024 * 1024) {
+                    return this.fileToDataUrl(file);
+                } else {
                     throw new Error('GIF file size must be under 1MB. Please use a smaller GIF or convert to another format.');
                 }
-                console.log('Converting GIF to data URL');
-                const dataUrl = await this.fileToDataUrl(file);
-                return { dataUrl, mimeType: 'image/gif', wasCompressed: false };
             }
-            
-            // For non-GIF formats, always convert to JPEG using canvas
-            console.log('Starting JPEG conversion/compression for file type:', file.type);
-              
+        
+            // For other formats, compress if needed and return as data URL
+            if (file.size <= 1024 * 1024) {
+                console.log('File already under 1MB, converting to data URL without compression');
+                return this.fileToDataUrl(file);
+            }
+        
+            console.log('Starting compression for file type:', file.type);
+          
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
-                
+        
                 img.onload = () => {
                     const originalSizeKB = Math.round(file.size / 1024);
-                    
+        
                     // Smart compression strategy based on original size
                     let targetSizeKB, maxQuality, minQuality;
-                    
+        
                     if (originalSizeKB <= 100) {
                         targetSizeKB = Math.max(originalSizeKB * 0.9, 80);
                         maxQuality = 0.98;
@@ -352,72 +352,95 @@ document.addEventListener('DOMContentLoaded', function() {
                         maxQuality = 0.90;
                         minQuality = 0.78;
                     }
-                    
+        
                     // Calculate optimal dimensions (max 1920px for quality)
                     let { width, height } = img;
                     const maxDimension = 1920;
-                    
+        
                     if (width > maxDimension || height > maxDimension) {
                         const ratio = Math.min(maxDimension / width, maxDimension / height);
                         width *= ratio;
                         height *= ratio;
                     }
-                    
+        
                     canvas.width = width;
                     canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Try high quality first - if it's already under target, use it
+        
+                    // Try high quality first
                     const highQualityDataUrl = canvas.toDataURL('image/jpeg', maxQuality);
                     const highQualitySizeKB = Math.round((highQualityDataUrl.length * 0.75) / 1024);
-                    
+        
                     if (highQualitySizeKB <= targetSizeKB) {
                         console.log(`Image optimized: ${originalSizeKB}KB → ${highQualitySizeKB}KB (${maxQuality * 100}% quality)`);
-                        resolve({ dataUrl: highQualityDataUrl, mimeType: 'image/jpeg', wasCompressed: true });
+                        resolve(highQualityDataUrl);
                         return;
                     }
 
-                    // Binary search for optimal quality to hit target size
+                    // Binary search for optimal quality
                     const findOptimalQuality = (minQ, maxQ, attempts = 0) => {
-                        if (attempts > 6) { // Max 6 attempts for performance
-                            return canvas.toDataURL('image/jpeg', Math.max(minQ, 0.75)); // Never go below 75%
+                        if (attempts > 6) {
+                            return canvas.toDataURL('image/jpeg', Math.max(minQ, 0.75));
                         }
-                        
+        
                         const midQ = (minQ + maxQ) / 2;
                         const dataUrl = canvas.toDataURL('image/jpeg', midQ);
                         const sizeKB = Math.round((dataUrl.length * 0.75) / 1024);
-                        
-                        if (Math.abs(sizeKB - targetSizeKB) < 25) { // Within 25KB of target
+        
+                        if (Math.abs(sizeKB - targetSizeKB) < 25) {
                             return dataUrl;
                         }
-                        
+        
                         if (sizeKB > targetSizeKB) {
                             return findOptimalQuality(minQ, midQ, attempts + 1);
                         } else {
                             return findOptimalQuality(midQ, maxQ, attempts + 1);
                         }
                     };
-                    
+        
                     const compressedDataUrl = findOptimalQuality(minQuality, maxQuality);
                     const finalSizeKB = Math.round((compressedDataUrl.length * 0.75) / 1024);
                     const compressionRatio = Math.round((1 - finalSizeKB / originalSizeKB) * 100);
-                    
+        
                     console.log(`Image compressed: ${originalSizeKB}KB → ${finalSizeKB}KB (${compressionRatio}% reduction)`);
-                    resolve({ dataUrl: compressedDataUrl, mimeType: 'image/jpeg', wasCompressed: true });
+                    resolve(compressedDataUrl);
                 };
-                
+        
+                img.onerror = () => {
+                    console.error('Failed to load image for compression');
+                    // Fallback to original file as data URL
+                    resolve(this.fileToDataUrl(file));
+                };
+        
                 img.src = URL.createObjectURL(file);
             });
         },
 
-        async uploadToRemote(dataUrl, fileName, twitterUser) {
+        // *** FIXED: Consistent upload handling for both GIFs and images ***
+        async uploadToRemote(dataUrl, fileName, twitterUser, originalFile = null) {
             const cfg = window.MonadgramConfig || {};
             const uploadUrl = cfg.EDGE?.UPLOAD_URL;
-            
+        
             if (!uploadUrl) {
                 throw new Error('Remote upload not configured');
             }
-            
+        
+            // *** FIXED: Include file type information for proper handling ***
+            const payload = { 
+                dataUrl, 
+                fileName, 
+                twitter: twitterUser,
+                fileType: originalFile?.type || 'image/jpeg',
+                isGif: originalFile?.type === 'image/gif' || false
+            };
+        
+            console.log('Uploading to remote with payload:', {
+                fileName,
+                fileType: payload.fileType,
+                isGif: payload.isGif,
+                dataUrlLength: dataUrl.length
+            });
+        
             const response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: {
@@ -427,39 +450,48 @@ document.addEventListener('DOMContentLoaded', function() {
                         'Authorization': `Bearer ${cfg.SUPABASE_ANON_KEY}` 
                     } : {}),
                 },
-                body: JSON.stringify({ 
-                    dataUrl, 
-                    fileName, 
-                    twitter: twitterUser 
-                })
+                body: JSON.stringify(payload)
             });
-            
+        
             if (!response.ok) {
-                throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                const errorText = await response.text().catch(() => 'Unknown error');
+                throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
             }
-            
+        
             return response;
         },
-        
-        saveToLocal(dataUrl, twitterUser) {
+    
+        // *** FIXED: Enhanced local storage with proper metadata ***
+        saveToLocal(dataUrl, twitterUser, originalFile = null) {
             const submission = {
                 id: `sub_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
                 src: dataUrl,
                 twitter: twitterUser,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                fileType: originalFile?.type || 'image/jpeg',
+                fileName: originalFile?.name || `upload_${Date.now()}.jpg`,
+                isGif: originalFile?.type === 'image/gif' || false
             };
-            
+        
+            console.log('Saving to local storage:', {
+                id: submission.id,
+                fileType: submission.fileType,
+                fileName: submission.fileName,
+                isGif: submission.isGif,
+                dataUrlLength: dataUrl.length
+            });
+        
             const pending = StorageManager.getPendingSubmissions();
             pending.push(submission);
             return StorageManager.setPendingSubmissions(pending);
         },
-        
+    
         setButtonState(isLoading, text) {
             try {
                 if (DOM.uploadBtn) {
                     DOM.uploadBtn.disabled = isLoading;
                     DOM.uploadBtn.textContent = text;
-                    
+        
                     if (isLoading) {
                         DOM.uploadBtn.classList.add('uploading');
                         DOM.uploadBtn.setAttribute('aria-busy', 'true');
@@ -472,25 +504,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 ErrorHandler.logError('UploadManager.setButtonState', error);
             }
         },
-        
-        // Helper function to convert file to data URL (preserves GIF animation)
+    
+        // *** FIXED: Consistent file to data URL conversion ***
         async fileToDataUrl(file) {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => {
                     const result = reader.result;
                     console.log('File converted to data URL:', {
                         type: file.type,
+                        name: file.name,
                         size: file.size,
                         resultLength: result.length,
                         isGif: file.type === 'image/gif'
                     });
                     resolve(result);
                 };
+                reader.onerror = () => {
+                    console.error('Failed to convert file to data URL');
+                    reject(new Error('Failed to read file'));
+                };
                 reader.readAsDataURL(file);
             });
         },
-        
+    
         resetState() {
             try {
                 this.setButtonState(false, 'Upload');
@@ -499,6 +536,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (DOM.imagePreviewImg) {
                     DOM.imagePreviewImg.removeAttribute('src');
+                }
+                if (DOM.fileInfo) {
+                    DOM.fileInfo.style.display = 'none';
                 }
                 AppState.setUploading(false);
             } catch (error) {
@@ -1000,45 +1040,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 UploadManager.setButtonState(true, 'Processing...');
                 
                 try {
-                    const result = await UploadManager.compressImage(file);
-                    let fileName = file.name;
+                    console.log('Starting upload process for:', {
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        isGif: file.type === 'image/gif'
+                    });
                     
-                    if (result.wasCompressed) {
-                        const extMatch = fileName.match(/\.\w+$/);
-                        if (extMatch) {
-                            fileName = fileName.replace(extMatch[0], '.jpg');
-                        } else {
-                            fileName += '.jpg';
-                        }
-                        console.log('Compressed image, adjusted fileName to:', fileName);
-                    }
-                    
-                    const uploadData = result.dataUrl;
+                    // *** FIXED: All files go through the same compression pipeline ***
+                    // compressImage now handles GIFs properly and returns data URL consistently
+                    const processedDataUrl = await UploadManager.compressImage(file);
                     
                     // Update button to show upload status
                     UploadManager.setButtonState(true, 'Uploading...');
                     
                     const cfg = window.MonadgramConfig || {};
                     
+                    // Try remote upload first
                     if (cfg.EDGE?.UPLOAD_URL) {
                         try {
-                            console.log('Uploading to remote:', {
-                                type: result.mimeType,
-                                fileName: fileName,
-                                dataLength: uploadData.length,
-                                wasCompressed: result.wasCompressed
-                            });
-                            
-                            await UploadManager.uploadToRemote(uploadData, fileName, twitterUser);
-                            console.log('Upload successful!');
+                            console.log('Attempting remote upload...');
+                            await UploadManager.uploadToRemote(processedDataUrl, file.name, twitterUser, file);
+                            console.log('Remote upload successful!');
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
-                            UploadManager.saveToLocal(uploadData, twitterUser);
+                            UploadManager.saveToLocal(processedDataUrl, twitterUser, file);
                             MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
                         }
                     } else {
-                        UploadManager.saveToLocal(uploadData, twitterUser);
+                        // Local storage fallback
+                        console.log('No remote upload configured, saving locally');
+                        UploadManager.saveToLocal(processedDataUrl, twitterUser, file);
                         MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                     }
                     
