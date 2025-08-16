@@ -302,23 +302,29 @@ document.addEventListener('DOMContentLoaded', function() {
             return handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`;
         },
 
-                  // Smart image compression - maintains quality while optimizing size
-          async compressImage(file) {
-              // Don't compress GIFs - preserve animation
-              if (file.type === 'image/gif') {
-                  // For GIFs, only check size - don't compress
-                  if (file.size <= 1024 * 1024) {
-                      return file;
-                  } else {
-                      // GIF is too large - reject it
-                      throw new Error('GIF file size must be under 1MB. Please use a smaller GIF or convert to another format.');
-                  }
-              }
-              
-              // For other formats, use existing compression logic
-              if (file.size <= 1024 * 1024) {
-                  return file;
-              }
+                          // Smart image compression - maintains quality while optimizing size
+        async compressImage(file) {
+            console.log('compressImage called for:', file.type, 'size:', file.size);
+            
+            // Don't compress GIFs - preserve animation
+            if (file.type === 'image/gif') {
+                console.log('GIF detected, bypassing compression');
+                // For GIFs, only check size - don't compress
+                if (file.size <= 1024 * 1024) {
+                    return file;
+                } else {
+                    // GIF is too large - reject it
+                    throw new Error('GIF file size must be under 1MB. Please use a smaller GIF or convert to another format.');
+                }
+            }
+            
+            // For other formats, use existing compression logic
+            if (file.size <= 1024 * 1024) {
+                console.log('File already under 1MB, no compression needed');
+                return file;
+            }
+            
+            console.log('Starting compression for file type:', file.type);
               
               return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
@@ -1001,7 +1007,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 try {
                     // Handle GIFs separately - no compression, no processing
+                    let uploadData;
                     let fileName = file.name;
+                    
+                    if (file.type === 'image/gif') {
+                        // GIFs: Use original file directly, no compression, no conversion
+                        uploadData = file;
+                        console.log('GIF upload - using original file, no processing');
+                    } else {
+                        // Other formats: Use compression
+                        uploadData = await UploadManager.compressImage(file);
+                        console.log('Non-GIF compressed, size:', uploadData.length);
+                    }
                     
                     // Update button to show upload status
                     UploadManager.setButtonState(true, 'Uploading...');
@@ -1010,39 +1027,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (cfg.EDGE?.UPLOAD_URL) {
                         try {
-                            // For GIFs, convert to data URL for upload
-                            let finalUploadData;
+                            // For GIFs, convert to data URL only at the last moment for upload
+                            let finalUploadData = uploadData;
                             if (file.type === 'image/gif') {
                                 finalUploadData = await UploadManager.fileToDataUrl(file);
-                                console.log('GIF upload - converted to data URL for upload');
+                                console.log('GIF converted to data URL for upload');
                             } else {
-                                // Other formats: Use compression
-                                finalUploadData = await UploadManager.compressImage(file);
+                                // For compressed images, uploadData is already a data URL
+                                finalUploadData = uploadData;
+                                console.log('Using compressed data URL for upload');
                             }
                             
+                            console.log('Uploading to remote:', {
+                                type: file.type,
+                                fileName: fileName,
+                                dataLength: finalUploadData.length,
+                                isGif: file.type === 'image/gif'
+                            });
+                            
                             await UploadManager.uploadToRemote(finalUploadData, fileName, twitterUser);
+                            console.log('Upload successful!');
                             MessageManager.show('Thank you for sharing your Monad art! It has been submitted for approval.', 'success');
                         } catch (remoteError) {
                             console.error('Remote upload failed, falling back to local:', remoteError);
-                            // For local storage, convert to data URL for all formats
-                            let localData;
+                            // For local storage, use original file for GIFs
                             if (file.type === 'image/gif') {
-                                localData = await UploadManager.fileToDataUrl(file);
+                                UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
                             } else {
-                                localData = await UploadManager.compressImage(file);
+                                UploadManager.saveToLocal(uploadData, twitterUser);
                             }
-                            UploadManager.saveToLocal(localData, twitterUser);
                             MessageManager.show('Upload failed, but saved locally. Please try again later.', 'warning');
                         }
                     } else {
-                        // For local storage, convert to data URL for all formats
-                        let localData;
+                        // For local storage, use original file for GIFs
                         if (file.type === 'image/gif') {
-                            localData = await UploadManager.fileToDataUrl(file);
+                            UploadManager.saveToLocal(await UploadManager.fileToDataUrl(file), twitterUser);
                         } else {
-                            localData = await UploadManager.compressImage(file);
+                            UploadManager.saveToLocal(uploadData, twitterUser);
                         }
-                        UploadManager.saveToLocal(localData, twitterUser);
                         MessageManager.show('Thank you for sharing your Monad art! It has been saved locally.', 'success');
                     }
                     
